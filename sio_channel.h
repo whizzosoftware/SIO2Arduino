@@ -19,6 +19,17 @@ const byte CMD_READ             = 0x52;
 const byte CMD_STATUS           = 0x53;
 const byte CMD_WRITE            = 0x57;
 
+const byte DEVICE_D1            = 0x31;
+const byte DEVICE_D2            = 0x32;
+const byte DEVICE_D3            = 0x33;
+const byte DEVICE_D4            = 0x34;
+const byte DEVICE_D5            = 0x35;
+const byte DEVICE_D6            = 0x36;
+const byte DEVICE_D7            = 0x37;
+const byte DEVICE_D8            = 0x38;
+const byte DEVICE_P1            = 0x40;
+const byte DEVICE_R1            = 0x50;
+
 class SIOChannel {
 public:
   SIOChannel(int cmdPin, Stream* stream, DriveStatus*(*deviceStatusFunc)(int), SectorPacket*(*readSectorFunc)(int,unsigned long), boolean(*writeSectorFunc)(int,unsigned long,byte*,unsigned long), boolean(*formatFunc)(int,int));

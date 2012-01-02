@@ -120,7 +120,7 @@ boolean SIOChannel::isChecksumValid() {
 
 boolean SIOChannel::isCommandForThisDevice() {
   // we only emulate drive 1 right now
-  return (m_cmdFrame.deviceId == 0x31 || m_cmdFrame.deviceId == 0x71);
+  return (m_cmdFrame.deviceId == DEVICE_D1);
 }
 
 boolean SIOChannel::isValidCommand() {
