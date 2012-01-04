@@ -24,6 +24,7 @@
 #include "log.h"
 
 DiskImage::DiskImage() {
+  m_fileRef = NULL;
 }
 
 boolean DiskImage::setFile(File* file) {
@@ -42,6 +43,8 @@ boolean DiskImage::setFile(File* file) {
     m_sectorBuffer.sectorData = (byte*)malloc(sizeof(byte) * m_sectorSize);
     LOG_MSG_CR(file->name());
     return true;
+  } else {
+    m_fileRef = NULL;
   }
   
   return false;
@@ -56,12 +59,30 @@ unsigned long DiskImage::getSectorSize() {
  */
 SectorPacket* DiskImage::getSectorData(unsigned long sector) {
   // seek to proper offset in file
-  unsigned long offset = m_headerSize + ((sector - 1) * m_sectorSize);
-  m_fileRef->seek(offset);
+  if (m_type == TYPE_PRO) {
+    // if this is a PRO image, we seek based on the sector number + the sector header size (omitting the header)
+    m_fileRef->seek(m_headerSize + ((sector - 1) * (m_sectorSize + sizeof(m_proSectorHeader))));
+    // then we read the sector header
+    for (int i=0; i < sizeof(m_proSectorHeader); i++) {
+      ((byte*)&m_proSectorHeader)[i] = (byte)m_fileRef->read();
+    }
+    // if the header shows there was an error in this sector, return an error
+    if (!m_proSectorHeader.statusFrame.hardwareStatus.crcError) {
+      return NULL;
+    }
+  } else {
+    // if this is an ATR image, we seek based on the sector number (omitting the header)
+    m_fileRef->seek(m_headerSize + ((sector - 1) * m_sectorSize));
+  }
 
   m_sectorBuffer.sectorSize = m_sectorSize;
 
-  // write sector data
+  // delay if necessary
+  if (m_sectorReadDelay) {
+    delay(m_sectorReadDelay);
+  }
+
+  // read sector data into buffer
   for (int i=0; i < m_sectorSize; i++) {
     m_sectorBuffer.sectorData[i] = (byte)m_fileRef->read();
   }
@@ -102,7 +123,7 @@ boolean DiskImage::format(File *file, int density) {
     memset(&header, 0, sizeof(header));
     header.signature = ATR_SIGNATURE;
     header.pars = length / 0x10;
-    header.secSize = 128;
+    header.secSize = SECTOR_SIZE_SD;
     file->write((byte*)&header, sizeof(header));
   }
 
@@ -116,33 +137,45 @@ boolean DiskImage::format(File *file, int density) {
 }
 
 boolean DiskImage::loadFile(File *file) {
-  // first, we'll check if it's an ATR since that is a structured format
-  // (we examine the actual file header in case the file is mis-named)
-  
-  // read file header (first 16 bytes)
+  // make sure we're at the beginning of file
   file->seek(0);
-  ATRHeader atrHeader;
-  byte* b = (byte*)&atrHeader;
-  for (int i=0; i < sizeof(atrHeader); i++) {
-    *b = (byte)file->read();
-    b++;
+  
+  // read first 16 bytes of file & rewind again
+  byte header[16];
+  for (int i=0; i < 16; i++) {
+    header[i] = (byte)file->read();
   }
   file->seek(0);
   
-  // check for a valid ATR header
-  if (atrHeader.signature == ATR_SIGNATURE) {
+  // check if it's an ATR
+  ATRHeader* atrHeader = (ATRHeader*)&header;
+  if (atrHeader->signature == ATR_SIGNATURE) {
     m_type = TYPE_ATR;
     m_headerSize = 16;
-    m_sectorSize = atrHeader.secSize;
+    m_sectorSize = atrHeader->secSize;
+    m_sectorReadDelay = 0;
     
-    LOG_MSG("Loaded an ATR with sector size ");
-    LOG_MSG(atrHeader.secSize);
+    LOG_MSG("Loaded ATR with sector size ");
+    LOG_MSG(atrHeader->secSize);
     LOG_MSG(": ");
     
     return true;
   }
 
-  // if it wasn't an ATR, check if it's an XFD
+  // check if it's an APE PRO image
+  PROFileHeader* proHeader = (PROFileHeader*)&header;
+  if (proHeader->sectorCountHi * 256 + proHeader->sectorCountLo == ((m_fileSize-16)/(SECTOR_SIZE_SD+sizeof(m_proSectorHeader))) && proHeader->magic == 'P') {
+    m_type = TYPE_PRO;
+    m_headerSize = 16;
+    m_sectorSize = SECTOR_SIZE_SD;
+    m_sectorReadDelay = proHeader->sectorReadDelay * (1000/60);
+
+    LOG_MSG("Loaded PRO with sector size 128: ");
+
+    return true;
+  }
+
+  // check if it's an XFD
   // (since an XFD is just a raw data dump, we can only determine this by file name and size)
   char *filename = file->name();
   int len = strlen(filename);
@@ -150,14 +183,19 @@ boolean DiskImage::loadFile(File *file) {
   if ((!strcmp(".XFD", extension) || !strcmp(".xfd", extension)) && (m_fileSize == FORMAT_SS_SD_40)) {
     m_type = TYPE_XFD;
     m_headerSize = 0;
-    m_sectorSize = 128;
+    m_sectorSize = SECTOR_SIZE_SD;
+    m_sectorReadDelay = 0;
 
-    LOG_MSG("Loaded an XFD with sector size 128: ");
+    LOG_MSG("Loaded XFD with sector size 128: ");
 
     return true;
   }
   
   return false;
+}
+
+boolean DiskImage::hasImage() {
+  return (m_fileRef != NULL);
 }
 
 boolean DiskImage::isEnhancedDensity() {
