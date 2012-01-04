@@ -94,46 +94,54 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
  * Write data to drive image.
  */
 boolean DiskImage::writeSectorData(unsigned long sector, byte* data, unsigned long len) {
-  // seek to proper offset in file
-  unsigned long offset = m_headerSize + ((sector - 1) * m_sectorSize);
-  m_fileRef->seek(offset);
-
-  // write the data
-  unsigned long wrote = m_fileRef->write(data, len);
-  m_fileRef->flush();
-  return (wrote == len);
+  if (!m_readOnly) {
+    // seek to proper offset in file
+    unsigned long offset = m_headerSize + ((sector - 1) * m_sectorSize);
+    m_fileRef->seek(offset);
+  
+    // write the data
+    unsigned long wrote = m_fileRef->write(data, len);
+    m_fileRef->flush();
+    return (wrote == len);
+  }
+  
+  return false;
 }
 
 /**
  * Format drive image.
  */
 boolean DiskImage::format(File *file, int density) {
-  // determine file length
-  unsigned long length = FORMAT_SS_SD_40;
-  if (density == DENSITY_ED) {
-    length = FORMAT_SS_ED_40;
+  if (!m_readOnly) {
+    // determine file length
+    unsigned long length = FORMAT_SS_SD_40;
+    if (density == DENSITY_ED) {
+      length = FORMAT_SS_ED_40;
+    }
+  
+    // make sure we're at beginning of file
+    file->seek(0);
+  
+    // if disk is an ATR, write the header
+    if (m_type == TYPE_ATR) {
+      ATRHeader header;
+      memset(&header, 0, sizeof(header));
+      header.signature = ATR_SIGNATURE;
+      header.pars = length / 0x10;
+      header.secSize = SECTOR_SIZE_SD;
+      file->write((byte*)&header, sizeof(header));
+    }
+  
+    // create empty byte buffer
+    for (unsigned long i=0; i < length; i++) {
+      file->write((byte)0);
+    }
+    file->flush();
+  
+    return true;
   }
-
-  // make sure we're at beginning of file
-  file->seek(0);
-
-  // if disk is an ATR, write the header
-  if (m_type == TYPE_ATR) {
-    ATRHeader header;
-    memset(&header, 0, sizeof(header));
-    header.signature = ATR_SIGNATURE;
-    header.pars = length / 0x10;
-    header.secSize = SECTOR_SIZE_SD;
-    file->write((byte*)&header, sizeof(header));
-  }
-
-  // create empty byte buffer
-  for (unsigned long i=0; i < length; i++) {
-    file->write((byte)0);
-  }
-  file->flush();
-
-  return true;
+  
+  return false;
 }
 
 boolean DiskImage::loadFile(File *file) {
@@ -152,6 +160,7 @@ boolean DiskImage::loadFile(File *file) {
   if (atrHeader->signature == ATR_SIGNATURE) {
     m_type = TYPE_ATR;
     m_headerSize = 16;
+    m_readOnly = false;
     m_sectorSize = atrHeader->secSize;
     m_sectorReadDelay = 0;
     
@@ -166,6 +175,7 @@ boolean DiskImage::loadFile(File *file) {
   PROFileHeader* proHeader = (PROFileHeader*)&header;
   if (proHeader->sectorCountHi * 256 + proHeader->sectorCountLo == ((m_fileSize-16)/(SECTOR_SIZE_SD+sizeof(m_proSectorHeader))) && proHeader->magic == 'P') {
     m_type = TYPE_PRO;
+    m_readOnly = true;
     m_headerSize = 16;
     m_sectorSize = SECTOR_SIZE_SD;
     m_sectorReadDelay = proHeader->sectorReadDelay * (1000/60);
@@ -182,6 +192,7 @@ boolean DiskImage::loadFile(File *file) {
   char *extension = filename + len - 4;
   if ((!strcmp(".XFD", extension) || !strcmp(".xfd", extension)) && (m_fileSize == FORMAT_SS_SD_40)) {
     m_type = TYPE_XFD;
+    m_readOnly = false;
     m_headerSize = 0;
     m_sectorSize = SECTOR_SIZE_SD;
     m_sectorReadDelay = 0;

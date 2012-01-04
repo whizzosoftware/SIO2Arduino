@@ -77,6 +77,7 @@ private:
   File*            m_fileRef;
   byte             m_type;
   unsigned long    m_fileSize;
+  boolean          m_readOnly;
   unsigned long    m_headerSize;
   unsigned long    m_sectorSize;
   byte             m_sectorReadDelay;
