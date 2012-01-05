@@ -14,6 +14,7 @@ const byte STATE_WAIT_CMD_END   = 5;
 
 const byte CMD_FORMAT           = 0x21;
 const byte CMD_FORMAT_MD        = 0x22;
+const byte CMD_POLL             = 0x3F;
 const byte CMD_PUT              = 0x50;
 const byte CMD_READ             = 0x52;
 const byte CMD_STATUS           = 0x53;
@@ -27,7 +28,6 @@ const byte DEVICE_D5            = 0x35;
 const byte DEVICE_D6            = 0x36;
 const byte DEVICE_D7            = 0x37;
 const byte DEVICE_D8            = 0x38;
-const byte DEVICE_P1            = 0x40;
 const byte DEVICE_R1            = 0x50;
 
 class SIOChannel {
@@ -40,6 +40,7 @@ public:
 private:
   boolean isChecksumValid();
   boolean isCommandForThisDevice();
+  boolean isValidDevice(byte b);
   boolean isValidCommand();
   boolean isValidAuxData();
   byte checksum(byte* chunk, int size);

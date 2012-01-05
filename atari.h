@@ -1,10 +1,10 @@
 #ifndef ATARI_H
 #define ATARI_H
 
-const byte DELAY_T2 = 5;
+const byte DELAY_T2 = 1;
 const byte DELAY_T3 = 2;
 const byte DELAY_T4 = 1;
-const byte DELAY_T5 = 1;
+const byte DELAY_T5 = 4;
 
 const byte ACK      = 0x41;
 const byte NAK      = 0x4E;
@@ -34,7 +34,7 @@ struct HardwareStatus {
   byte crcError:1;
   byte recordNotFound:1;
   byte recordType:1;
-  byte writeProtected:1;
+  byte writeProtect:1;
   byte notReady:1;
 };
 
@@ -46,7 +46,7 @@ struct CommandStatus {
   byte motorStatus:1;
   byte doubleDensity:1;
   byte unused:1;
-  byte enhancedDensity:1;  
+  byte enhancedDensity:1;
 };
 
 struct StatusFrame {
@@ -63,7 +63,11 @@ struct DriveStatus {
 
 struct SectorPacket {
   unsigned long sectorSize;
+  StatusFrame statusFrame;
+  boolean validStatusFrame;
+  boolean error;
   byte* sectorData;
+  
 };
 
 #endif

@@ -58,24 +58,38 @@ unsigned long DiskImage::getSectorSize() {
  * Read data from drive image.
  */
 SectorPacket* DiskImage::getSectorData(unsigned long sector) {
+  m_sectorBuffer.sectorSize = m_sectorSize;
+  m_sectorBuffer.error = false;
+  m_sectorBuffer.validStatusFrame = false;
+
   // seek to proper offset in file
   if (m_type == TYPE_PRO) {
     // if this is a PRO image, we seek based on the sector number + the sector header size (omitting the header)
     m_fileRef->seek(m_headerSize + ((sector - 1) * (m_sectorSize + sizeof(m_proSectorHeader))));
+
     // then we read the sector header
     for (int i=0; i < sizeof(m_proSectorHeader); i++) {
       ((byte*)&m_proSectorHeader)[i] = (byte)m_fileRef->read();
     }
+
+    // return the status frame so the drive can return it on a subsequent status command
+    memcpy(&m_sectorBuffer.statusFrame, &m_proSectorHeader, sizeof(m_sectorBuffer.statusFrame));
+    m_sectorBuffer.validStatusFrame = true;
+    
     // if the header shows there was an error in this sector, return an error
-    if (!m_proSectorHeader.statusFrame.hardwareStatus.crcError) {
-      return NULL;
+    if (!m_proSectorHeader.statusFrame.hardwareStatus.crcError || !m_proSectorHeader.statusFrame.hardwareStatus.dataLostOrTrack0) {
+      m_sectorBuffer.error = true;
+    } else {
+      // if there are phantom sector(s) associated with this sector, decide what to return
+      if (m_usePhantoms && m_proSectorHeader.totalPhantoms > 0 && m_phantomFlip) {
+        m_fileRef->seek(m_headerSize + (((720 + m_proSectorHeader.phantom1) - 1) * (m_sectorSize + sizeof(m_proSectorHeader))) + sizeof(m_proSectorHeader));
+      }
     }
+    m_phantomFlip = !m_phantomFlip; // TODO: do bad sectors cause this to flip?
   } else {
     // if this is an ATR image, we seek based on the sector number (omitting the header)
     m_fileRef->seek(m_headerSize + ((sector - 1) * m_sectorSize));
   }
-
-  m_sectorBuffer.sectorSize = m_sectorSize;
 
   // delay if necessary
   if (m_sectorReadDelay) {
@@ -179,6 +193,25 @@ boolean DiskImage::loadFile(File *file) {
     m_headerSize = 16;
     m_sectorSize = SECTOR_SIZE_SD;
     m_sectorReadDelay = proHeader->sectorReadDelay * (1000/60);
+    
+    // set the phantom emulation mode
+    switch (proHeader->phantomSectorMode) {
+      case PSM_SIMPLE:
+      case PSM_MINDSCAPE_SPECIAL:
+      case PSM_STICKY:
+      case PSM_SHIMMERING:
+      case PSM_REVERSE_SHIMMER:
+        m_usePhantoms = false;
+        break;
+      case PSM_GLOBAL_FLIP_FLOP:
+        m_usePhantoms = true;
+        m_phantomFlip = false;
+        break;
+      case PSM_GLOBAL_FLOP_FLIP:
+        m_usePhantoms = true;
+        m_phantomFlip = true;
+        break;
+    }
 
     LOG_MSG("Loaded PRO with sector size 128: ");
 
@@ -215,4 +248,8 @@ boolean DiskImage::isEnhancedDensity() {
 
 boolean DiskImage::isDoubleDensity() {
   return (m_fileSize == FORMAT_SS_DD_35 + m_headerSize || m_fileSize == FORMAT_SS_DD_40 + m_headerSize);
+}
+
+boolean DiskImage::isReadOnly() {
+  return m_readOnly;
 }

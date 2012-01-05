@@ -85,9 +85,13 @@ void SIOChannel::processIncomingByte() {
 
   // if we're waiting for a command, read the data into the command frame
   if (m_cmdPinState == STATE_READ_CMD) {
-    if ((int)m_cmdFramePtr - (int)&m_cmdFrame < COMMAND_FRAME_SIZE) {
+    int idx = (int)m_cmdFramePtr - (int)&m_cmdFrame;
+    // sometimes we see extra bytes on the bus while reading a command and things get lost --
+    // the isValidDevice() check prevents a command frame read from getting corrupted by them
+    if (idx < COMMAND_FRAME_SIZE && (idx > 0 || (idx == 0 && isValidDevice(b)))) {
       *m_cmdFramePtr = b;
       m_cmdFramePtr++;
+      return;
     }
   } else if (m_dataFrameReadInProgress) {
     *m_putSectorBufferPtr = b;
@@ -96,12 +100,12 @@ void SIOChannel::processIncomingByte() {
     if (m_putBytesRemaining == 0) {
       doPutSector();
     }
-  // otherwise, ignore it
-  } else {
-    LOG_MSG("Ignoring: ");
-    LOG_MSG(b, HEX);
-    LOG_MSG_CR();
+    return;
   }
+  // otherwise, ignore it
+  LOG_MSG("Ignoring: ");
+  LOG_MSG(b, HEX);
+  LOG_MSG_CR();
 }
 
 boolean SIOChannel::isChecksumValid() {
@@ -130,6 +134,18 @@ boolean SIOChannel::isValidCommand() {
           m_cmdFrame.command == CMD_PUT ||
           m_cmdFrame.command == CMD_FORMAT ||
           m_cmdFrame.command == CMD_FORMAT_MD);
+}
+
+boolean SIOChannel::isValidDevice(byte b) {
+  return (b == DEVICE_D1 ||
+          b == DEVICE_D2 ||
+          b == DEVICE_D3 ||
+          b == DEVICE_D4 ||
+          b == DEVICE_D5 ||
+          b == DEVICE_D6 ||
+          b == DEVICE_D7 ||
+          b == DEVICE_D8 ||
+          b == DEVICE_R1);
 }
 
 boolean SIOChannel::isValidAuxData() {
@@ -172,17 +188,28 @@ void SIOChannel::cmdGetSector(int deviceId) {
   delay(DELAY_T2);
   m_stream->write(ACK);
 
-  // send complete 
-  delay(DELAY_T5);
-  m_stream->write(COMPLETE);
-
   // write data frame + checksum
   SectorPacket *p = m_readSectorFunc(deviceId, getCommandSector());
+  if (p != NULL && !p->error) {
+    // send complete 
+    delay(DELAY_T5);
+    m_stream->write(COMPLETE);
+  } else {
+    // send error
+    delay(95);
+    m_stream->write(ERR);
+  }
+
+  delayMicroseconds(700);
+
+  // write data
   byte *b = p->sectorData;
   for (int i=0; i < p->sectorSize; i++) {
     m_stream->write(*b);
     b++;
   }
+  
+  // write checksum
   m_stream->write(checksum(p->sectorData, p->sectorSize));
   m_stream->flush();
 }
@@ -302,6 +329,12 @@ void SIOChannel::dumpCommandFrame() {
   LOG_MSG(" : ");
   
   switch (m_cmdFrame.command) {
+    case CMD_STATUS:
+      LOG_MSG("STATUS");
+      break;
+    case CMD_POLL:
+      LOG_MSG("POLL");
+      break;
     case CMD_READ:
       LOG_MSG("READ ");
       LOG_MSG(getCommandSector());
@@ -309,9 +342,6 @@ void SIOChannel::dumpCommandFrame() {
     case CMD_WRITE:
       LOG_MSG("WRITE ");
       LOG_MSG(getCommandSector());
-      break;
-    case CMD_STATUS:
-      LOG_MSG("STATUS");
       break;
     case CMD_PUT:
       LOG_MSG("PUT ");

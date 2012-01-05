@@ -31,6 +31,17 @@ struct ATRHeader {
 };
 
 // PRO format
+const byte PSM_SIMPLE            = 0;
+const byte PSM_MINDSCAPE_SPECIAL = 1;
+const byte PSM_GLOBAL_FLIP_FLOP  = 2;
+const byte PSM_GLOBAL_FLOP_FLIP  = 3;
+const byte PSM_HEURISTIC         = 4;
+const byte PSM_STICKY            = 5;
+const byte PSM_REVERSE_STICKY    = 6;
+const byte PSM_SHIMMERING        = 7;
+const byte PSM_REVERSE_SHIMMER   = 8;
+const byte PSM_ROLLING_THUNDER   = 9;
+
 struct PROFileHeader {
   byte sectorCountHi;
   byte sectorCountLo;
@@ -38,27 +49,27 @@ struct PROFileHeader {
   byte imageType;
   byte phantomSectorMode;
   byte sectorReadDelay;
-  byte b0;
-  byte b1;
-  byte b2;
-  byte b3;
-  byte b4;
-  byte b5;
-  byte b6;
-  byte b7;
-  byte b8;
-  byte b9;
+  byte g;
+  byte h;
+  byte i;
+  byte j;
+  byte k;
+  byte l;
+  byte m;
+  byte n;
+  byte o;
+  byte p;
 };
 struct PROSectorHeader {
   StatusFrame statusFrame;
-  byte b0;
-  byte b1;
-  byte b2;
-  byte b3;
-  byte b4;
-  byte b5;
-  byte b6;
-  byte b7;
+  byte m;
+  byte totalPhantoms;
+  byte phantom4;
+  byte phantom1;
+  byte phantom2;
+  byte phantom3;
+  byte n;
+  byte phantom5;
 };
 
 class DiskImage {
@@ -71,6 +82,7 @@ public:
   boolean format(File *file, int density);
   boolean isEnhancedDensity();
   boolean isDoubleDensity();
+  boolean isReadOnly();
   boolean hasImage();
 private:
   boolean loadFile(File* file);
@@ -82,7 +94,10 @@ private:
   unsigned long    m_sectorSize;
   byte             m_sectorReadDelay;
   SectorPacket     m_sectorBuffer;
+  // PRO specific fields
   PROSectorHeader  m_proSectorHeader;
+  boolean          m_usePhantoms;
+  boolean          m_phantomFlip;
 };
 
 #endif
