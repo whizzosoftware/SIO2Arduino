@@ -1,11 +1,6 @@
 #ifndef ATARI_H
 #define ATARI_H
 
-const byte DELAY_T2 = 1;
-const byte DELAY_T3 = 2;
-const byte DELAY_T4 = 1;
-const byte DELAY_T5 = 4;
-
 const byte ACK      = 0x41;
 const byte NAK      = 0x4E;
 const byte COMPLETE = 0x43;

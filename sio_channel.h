@@ -12,6 +12,11 @@ const byte STATE_READ_CMD       = 3;
 const byte STATE_READ_SECTOR    = 4;
 const byte STATE_WAIT_CMD_END   = 5;
 
+const byte DELAY_T2 = 1;
+const byte DELAY_T3 = 2;
+const byte DELAY_T4 = 1;
+const byte DELAY_T5 = 1;
+
 const byte CMD_FORMAT           = 0x21;
 const byte CMD_FORMAT_MD        = 0x22;
 const byte CMD_POLL             = 0x3F;

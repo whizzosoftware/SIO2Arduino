@@ -196,21 +196,28 @@ void SIOChannel::cmdGetSector(int deviceId) {
     m_stream->write(COMPLETE);
   } else {
     // send error
-    delay(95);
+    delay(DELAY_T5);
     m_stream->write(ERR);
   }
 
   delayMicroseconds(700);
 
-  // write data
-  byte *b = p->sectorData;
-  for (int i=0; i < p->sectorSize; i++) {
-    m_stream->write(*b);
-    b++;
+  if (p != NULL) {
+    byte *b = p->sectorData;
+    // write data
+    for (int i=0; i < p->sectorSize; i++) {
+      m_stream->write(*b);
+      b++;
+    }
+    // write checksum
+    m_stream->write(checksum(p->sectorData, p->sectorSize));
+  } else {
+    // write empty data + checksum
+    for (int i=0; i < SD_SECTOR_SIZE + 1; i++) {
+      m_stream->write((byte)0x00);
+    }
   }
   
-  // write checksum
-  m_stream->write(checksum(p->sectorData, p->sectorSize));
   m_stream->flush();
 }
 
