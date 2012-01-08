@@ -77,12 +77,12 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
     m_sectorBuffer.validStatusFrame = true;
     
     // if the header shows there was an error in this sector, return an error
-    if (!m_proSectorHeader.statusFrame.hardwareStatus.crcError || !m_proSectorHeader.statusFrame.hardwareStatus.dataLostOrTrack0) {
+    if (!m_proSectorHeader.statusFrame.hardwareStatus.crcError || !m_proSectorHeader.statusFrame.hardwareStatus.dataLostOrTrack0 || !m_proSectorHeader.statusFrame.hardwareStatus.recordNotFound) {
       m_sectorBuffer.error = true;
     } else {
       // if there are phantom sector(s) associated with this sector, decide what to return
       if (m_usePhantoms && m_proSectorHeader.totalPhantoms > 0 && m_phantomFlip) {
-        m_fileRef->seek(m_headerSize + (((720 + m_proSectorHeader.phantom1) - 1) * (m_sectorSize + sizeof(m_proSectorHeader))) + sizeof(m_proSectorHeader));
+        m_fileRef->seek(m_headerSize + (((720 + m_proSectorHeader.phantom1) - 1) * (m_sectorSize + sizeof(PROSectorHeader))) + sizeof(PROSectorHeader));
       }
     }
     m_phantomFlip = !m_phantomFlip; // TODO: do bad sectors cause this to flip?
