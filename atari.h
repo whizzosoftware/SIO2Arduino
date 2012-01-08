@@ -6,6 +6,11 @@ const byte NAK      = 0x4E;
 const byte COMPLETE = 0x43;
 const byte ERR      = 0x45;
 
+const byte DELAY_T2 = 1;
+const byte DELAY_T3 = 2;
+const byte DELAY_T4 = 1;
+const byte DELAY_T5 = 1;
+
 const byte DENSITY_SD = 1;
 const byte DENSITY_ED = 2;
 const byte DENSITY_DD = 3;

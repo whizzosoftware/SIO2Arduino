@@ -51,11 +51,23 @@ boolean DiskDrive::setImageFile(File *file) {
 
 SectorPacket* DiskDrive::getSectorData(unsigned long sector) {
   if (m_diskImage.hasImage()) {
+    unsigned long startTime = micros();
+    
     SectorPacket *packet = m_diskImage.getSectorData(sector);
     // store the status frame if valid
     if (packet->validStatusFrame) {
       memcpy(&m_driveStatus.statusFrame, &(packet->statusFrame), sizeof(m_driveStatus.statusFrame));
     }
+    
+    // for PRO images, make read time consistent across all sector reads to 
+    // allow skew-based protection to work
+    if (m_diskImage.getType() == TYPE_PRO) {
+      unsigned long time = micros() - startTime;
+      unsigned long delta = (MIN_PRO_SECTOR_READ * ((time - 1) / MIN_PRO_SECTOR_READ + 1)) - time;
+      delay(delta / 1000);             // Arduino's delayMicroseconds() can't reliably 
+      delayMicroseconds(delta % 1000); // handle an argument larger than 16,383
+    }
+    
     return packet;
   } else {
     return NULL;
