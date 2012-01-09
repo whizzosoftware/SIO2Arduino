@@ -317,13 +317,10 @@ void SIOChannel::cmdGetStatus(int deviceId) {
   byte* b = (byte*)&driveStatus->statusFrame;
   for (int i=0; i < frameLength; i++) {
     m_stream->write(*b);
-    LOG_MSG(*b, HEX);
-    LOG_MSG(" ");
     b++;
   }
   m_stream->write(chksum);
   
-  LOG_MSG_CR();
 }
 
 void SIOChannel::cmdFormat(int deviceId, int density) {

@@ -5,7 +5,7 @@
 #include "atari.h"
 #include "disk_image.h"
 
-const unsigned long MIN_PRO_SECTOR_READ = 75000 - DELAY_T5 * 1000;
+const unsigned long MIN_PRO_SECTOR_READ = 25000 - DELAY_T5 * 1000;
 
 class DiskDrive {
 public:
