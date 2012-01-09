@@ -71,7 +71,6 @@ private:
   DriveAccess*      m_driveAccess;
   DriveControl*     m_driveControl;
   unsigned long     m_startTimeoutInterval;
-  unsigned long     m_lastPrintout;
 };
 
 #endif
