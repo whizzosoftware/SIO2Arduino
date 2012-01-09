@@ -20,15 +20,15 @@
  * along with SIO2Arduino; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#include "config.h"
 #include <SD.h>
 #include "atari.h"
 #include "sio_channel.h"
 #include "disk_drive.h"
 #include "log.h"
-
-#define CMD_PIN     2
-#define SD_PIN      4
-#define SWITCH_PIN  8
+#ifdef LCD_DISPLAY
+#include <LiquidCrystal.h>
+#endif
 
 #define STATE_INIT           1
 #define STATE_WAIT_CMD_START 2
@@ -38,7 +38,10 @@
 // globals
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
 DriveControl driveControl(getFileList, mountFile);
-SIOChannel sioChannel(CMD_PIN, &Serial1, &driveAccess, &driveControl);
+SIOChannel sioChannel(PIN_ATARI_CMD, &Serial1, &driveAccess, &driveControl);
+#ifdef LCD_DISPLAY
+LiquidCrystal lcd(PIN_LCD_RD,PIN_LCD_ENABLE,PIN_LCD_DB4,PIN_LCD_DB5,PIN_LCD_DB6,PIN_LCD_DB7);
+#endif
 File root;
 File file; // TODO: make this unnecessary
 DiskDrive drive1;
@@ -52,33 +55,44 @@ void setup() {
   Serial1.begin(19200);
 
   // set pin modes
-  pinMode(SWITCH_PIN, INPUT);
+  #ifdef SELECTOR_BUTTON
+  pinMode(PIN_SELECTOR, INPUT);
+  #endif
+
+  #ifdef LCD_DISPLAY
+  // set up LCD if appropriate
+  lcd.begin(16, 2);
+  lcd.print("SIO2Arduino");
+  #endif
 
   // initialize SD card
   LOG_MSG("Initializing SD card...");
-  pinMode(SD_PIN, OUTPUT);
-  if (!SD.begin(SD_PIN)) {
+  pinMode(PIN_SD_CARD, OUTPUT);
+  if (!SD.begin(PIN_SD_CARD)) {
     LOG_MSG_CR(" failed.");
     return;
   }
-  LOG_MSG_CR(" done.");
   root = SD.open("/");
   if (!root) {
     LOG_MSG_CR("Error opening SD card");
   }
+  
+  LOG_MSG_CR(" done.");
 }
 
 void loop() {
   // let the SIO channel do its thing
   sioChannel.runCycle();
   
-  // watch the control switch
-  if (digitalRead(SWITCH_PIN) == HIGH && !isSwitchPressed) {
+  #ifdef SELECTOR_BUTTON
+  // watch the selector button
+  if (digitalRead(PIN_SELECTOR) == HIGH && !isSwitchPressed) {
     isSwitchPressed = true;
     changeDisk();
-  } else if (digitalRead(SWITCH_PIN) == LOW && isSwitchPressed) {
+  } else if (digitalRead(PIN_SELECTOR) == LOW && isSwitchPressed) {
     isSwitchPressed = false;
   }
+  #endif
 }
 
 void serialEvent1() {
@@ -144,4 +158,9 @@ void changeDisk() {
     file = SD.open(file.name(), FILE_WRITE);
     imageChanged = drive1.setImageFile(&file);
   }
+  
+  #ifdef LCD_DISPLAY
+  lcd.clear();
+  lcd.print(file.name());
+  #endif
 }
