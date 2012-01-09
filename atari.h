@@ -62,11 +62,11 @@ struct DriveStatus {
 };
 
 struct SectorPacket {
-  unsigned long sectorSize;
+  unsigned long length;
   StatusFrame statusFrame;
   boolean validStatusFrame;
   boolean error;
-  byte* sectorData;
+  byte* data;
   
 };
 

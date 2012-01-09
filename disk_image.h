@@ -76,6 +76,7 @@ class DiskImage {
 public:
   DiskImage();
   boolean setFile(File* file);
+  byte getType();
   unsigned long getSectorSize();
   SectorPacket* getSectorData(unsigned long sector);
   boolean writeSectorData(unsigned long, byte* data, unsigned long size);

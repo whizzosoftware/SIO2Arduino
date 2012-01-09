@@ -36,7 +36,9 @@
 #define STATE_WAIT_CMD_END   4
 
 // globals
-SIOChannel sioChannel(CMD_PIN, &Serial1, getDeviceStatus, readSector, writeSector, format);
+DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
+DriveControl driveControl(getFileList, mountFile);
+SIOChannel sioChannel(CMD_PIN, &Serial1, &driveAccess, &driveControl);
 File root;
 File file; // TODO: make this unnecessary
 DiskDrive drive1;

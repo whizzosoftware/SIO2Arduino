@@ -32,15 +32,15 @@ boolean DiskImage::setFile(File* file) {
   m_fileSize = file->size();
 
   // free up previous sector buffer if we had one
-  if (m_sectorBuffer.sectorData) {
-    free(m_sectorBuffer.sectorData);
-    m_sectorBuffer.sectorData = NULL;
+  if (m_sectorBuffer.data) {
+    free(m_sectorBuffer.data);
+    m_sectorBuffer.data = NULL;
   }
   
   // if image is valid...
   if (loadFile(file)) {
     // create new sector buffer
-    m_sectorBuffer.sectorData = (byte*)malloc(sizeof(byte) * m_sectorSize);
+    m_sectorBuffer.data = (byte*)malloc(sizeof(byte) * m_sectorSize);
     LOG_MSG_CR(file->name());
     return true;
   } else {
@@ -48,6 +48,10 @@ boolean DiskImage::setFile(File* file) {
   }
   
   return false;
+}
+
+byte DiskImage::getType() {
+  return m_type;
 }
 
 unsigned long DiskImage::getSectorSize() {
@@ -58,17 +62,17 @@ unsigned long DiskImage::getSectorSize() {
  * Read data from drive image.
  */
 SectorPacket* DiskImage::getSectorData(unsigned long sector) {
-  m_sectorBuffer.sectorSize = m_sectorSize;
+  m_sectorBuffer.length = m_sectorSize;
   m_sectorBuffer.error = false;
   m_sectorBuffer.validStatusFrame = false;
 
   // seek to proper offset in file
   if (m_type == TYPE_PRO) {
     // if this is a PRO image, we seek based on the sector number + the sector header size (omitting the header)
-    m_fileRef->seek(m_headerSize + ((sector - 1) * (m_sectorSize + sizeof(m_proSectorHeader))));
+    m_fileRef->seek(m_headerSize + ((sector - 1) * (m_sectorSize + sizeof(PROSectorHeader))));
 
     // then we read the sector header
-    for (int i=0; i < sizeof(m_proSectorHeader); i++) {
+    for (int i=0; i < sizeof(PROSectorHeader); i++) {
       ((byte*)&m_proSectorHeader)[i] = (byte)m_fileRef->read();
     }
 
@@ -98,7 +102,7 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
 
   // read sector data into buffer
   for (int i=0; i < m_sectorSize; i++) {
-    m_sectorBuffer.sectorData[i] = (byte)m_fileRef->read();
+    m_sectorBuffer.data[i] = (byte)m_fileRef->read();
   }
 
   return &m_sectorBuffer;
@@ -187,7 +191,7 @@ boolean DiskImage::loadFile(File *file) {
 
   // check if it's an APE PRO image
   PROFileHeader* proHeader = (PROFileHeader*)&header;
-  if (proHeader->sectorCountHi * 256 + proHeader->sectorCountLo == ((m_fileSize-16)/(SECTOR_SIZE_SD+sizeof(m_proSectorHeader))) && proHeader->magic == 'P') {
+  if (proHeader->sectorCountHi * 256 + proHeader->sectorCountLo == ((m_fileSize-16)/(SECTOR_SIZE_SD+sizeof(PROSectorHeader))) && proHeader->magic == 'P') {
     m_type = TYPE_PRO;
     m_readOnly = true;
     m_headerSize = 16;

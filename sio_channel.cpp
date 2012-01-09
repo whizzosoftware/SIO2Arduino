@@ -23,14 +23,11 @@
 #include "sio_channel.h"
 #include "log.h"
 
-SIOChannel::SIOChannel(int cmdPin, Stream* stream, DriveStatus*(*deviceStatusFunc)(int), SectorPacket*(*readSectorFunc)(int,unsigned long), boolean(*writeSectorFunc)(int,unsigned long,byte*,unsigned long), boolean(*formatFunc)(int,int)) {
+SIOChannel::SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess, DriveControl *driveControl) {
   m_cmdPin = cmdPin;
   m_stream = stream;
-  m_deviceStatusFunc = deviceStatusFunc;
-  m_readSectorFunc = readSectorFunc;
-  m_writeSectorFunc = writeSectorFunc;
-  m_formatFunc = formatFunc;
-  m_dataFrameReadInProgress = false;
+  m_driveAccess = driveAccess;
+  m_driveControl = driveControl;
   m_putSectorBuffer = (byte*)malloc(sizeof(byte) * MAX_SECTOR_SIZE);
 
   // set command pin to be read
@@ -50,25 +47,34 @@ void SIOChannel::runCycle() {
       case STATE_WAIT_CMD_START:
         if (digitalRead(m_cmdPin) == LOW) {
           m_cmdPinState = STATE_READ_CMD;
-          // reset last command frame info
-          memset(&m_cmdFrame, 0, sizeof(m_cmdFrame));
-          m_cmdFramePtr = (byte*)&m_cmdFrame;
-          m_dataFrameReadInProgress = false;
+          resetCommandFrameBuffer();
         }
         break;
       case STATE_READ_CMD:
-        // if command frame is complete...
+        m_startTimeoutInterval = millis();
+        // if command frame is fully read...
         if (m_cmdFramePtr - (byte*)&m_cmdFrame == COMMAND_FRAME_SIZE) {
           dumpCommandFrame();
           // process command frame
           if (isChecksumValid() && isCommandForThisDevice()) {
             if (isValidCommand() && isValidAuxData()) {
-              processCommand();
+              m_cmdPinState = processCommand();
             } else {
               m_stream->write(NAK);
+              m_cmdPinState = STATE_WAIT_CMD_START;
             }
+          } else {
+            m_cmdPinState = STATE_WAIT_CMD_START;
           }
-          m_cmdPinState = STATE_WAIT_CMD_END;
+        // otherwise, check for command read timeout
+        } else if (millis() - m_startTimeoutInterval > READ_CMD_TIMEOUT) {
+          m_cmdPinState = STATE_WAIT_CMD_START;
+        }
+        break;
+      case STATE_READ_DATAFRAME:
+        // check for timeout
+        if (millis() - m_startTimeoutInterval > READ_FRAME_TIMEOUT) {
+          m_cmdPinState = STATE_WAIT_CMD_START;
         }
         break;
       case STATE_WAIT_CMD_END:
@@ -83,29 +89,49 @@ void SIOChannel::processIncomingByte() {
   // read the next byte from the bus
   byte b = m_stream->read();
 
-  // if we're waiting for a command, read the data into the command frame
-  if (m_cmdPinState == STATE_READ_CMD) {
-    int idx = (int)m_cmdFramePtr - (int)&m_cmdFrame;
-    // sometimes we see extra bytes on the bus while reading a command and things get lost --
-    // the isValidDevice() check prevents a command frame read from getting corrupted by them
-    if (idx < COMMAND_FRAME_SIZE && (idx > 0 || (idx == 0 && isValidDevice(b)))) {
-      *m_cmdFramePtr = b;
-      m_cmdFramePtr++;
-      return;
+  switch (m_cmdPinState) {
+    // if we read a valid device byte and are in a "command wait" state, come out of it and
+    // process the byte
+    case STATE_INIT:
+    case STATE_WAIT_CMD_START:
+    case STATE_WAIT_CMD_END:
+      if (digitalRead(m_cmdPin) == LOW && isValidDevice(b)) {
+        m_cmdPinState = STATE_READ_CMD;
+        resetCommandFrameBuffer();
+      } else {
+        break;
+      }
+    // if we're reading a command frame...
+    case STATE_READ_CMD: {
+      // read the data into the command frame
+      int idx = (int)m_cmdFramePtr - (int)&m_cmdFrame;
+      // sometimes we see extra bytes between command frames on the bus while reading a command and things get lost --
+      // the isValidDevice() check prevents a command frame read from getting corrupted by them
+      if (idx < COMMAND_FRAME_SIZE && (idx > 0 || (idx == 0 && isValidDevice(b)))) {
+        *m_cmdFramePtr = b;
+        m_cmdFramePtr++;
+        return;
+      }
+      break;
     }
-  } else if (m_dataFrameReadInProgress) {
-    *m_putSectorBufferPtr = b;
-    m_putSectorBufferPtr++;
-    m_putBytesRemaining--;
-    if (m_putBytesRemaining == 0) {
-      doPutSector();
+    // if we're reading a data frame...
+    case STATE_READ_DATAFRAME: {
+      // add byte to read sector buffer
+      *m_putSectorBufferPtr = b;
+      m_putSectorBufferPtr++;
+      m_putBytesRemaining--;
+      if (m_putBytesRemaining == 0) {
+        doPutSector();
+      }
+      break;
     }
-    return;
+    default:
+      LOG_MSG("Ignoring byte ");
+      LOG_MSG(b, HEX);
+      LOG_MSG(" in state ");
+      LOG_MSG_CR(m_cmdPinState);
+      break;
   }
-  // otherwise, ignore it
-  LOG_MSG("Ignoring: ");
-  LOG_MSG(b, HEX);
-  LOG_MSG_CR();
 }
 
 boolean SIOChannel::isChecksumValid() {
@@ -160,8 +186,9 @@ byte SIOChannel::checksum(byte* chunk, int size) {
   return (byte)chkSum;
 }
 
-void SIOChannel::processCommand() {
+byte SIOChannel::processCommand() {
   int deviceId = 1;
+  byte nextCmdPinState = STATE_WAIT_CMD_END;
   
   switch (m_cmdFrame.command) {
     case CMD_READ:
@@ -170,6 +197,8 @@ void SIOChannel::processCommand() {
     case CMD_WRITE:
     case CMD_PUT:
       cmdPutSector(deviceId);
+      nextCmdPinState = STATE_READ_DATAFRAME;
+      m_startTimeoutInterval = millis();
       break;
     case CMD_STATUS:
       cmdGetStatus(deviceId);
@@ -181,6 +210,8 @@ void SIOChannel::processCommand() {
       cmdFormat(deviceId, DENSITY_ED);
       break;
   }
+  
+  return nextCmdPinState;
 }
 
 void SIOChannel::cmdGetSector(int deviceId) {
@@ -189,7 +220,7 @@ void SIOChannel::cmdGetSector(int deviceId) {
   m_stream->write(ACK);
 
   // write data frame + checksum
-  SectorPacket *p = m_readSectorFunc(deviceId, getCommandSector());
+  SectorPacket *p = m_driveAccess->readSectorFunc(deviceId, getCommandSector());
   if (p != NULL && !p->error) {
     // send complete 
     delay(DELAY_T5);
@@ -200,24 +231,26 @@ void SIOChannel::cmdGetSector(int deviceId) {
     m_stream->write(ERR);
   }
 
+  m_stream->flush();
+
   delayMicroseconds(700);
 
   if (p != NULL) {
-    byte *b = p->sectorData;
+    byte *b = p->data;
     // write data
-    for (int i=0; i < p->sectorSize; i++) {
+    for (int i=0; i < p->length; i++) {
       m_stream->write(*b);
       b++;
     }
     // write checksum
-    m_stream->write(checksum(p->sectorData, p->sectorSize));
+    m_stream->write(checksum(p->data, p->length));
   } else {
     // write empty data + checksum
     for (int i=0; i < SD_SECTOR_SIZE + 1; i++) {
       m_stream->write((byte)0x00);
     }
   }
-  
+
   m_stream->flush();
 }
 
@@ -226,15 +259,12 @@ void SIOChannel::cmdPutSector(int deviceId) {
   delay(DELAY_T2);
   m_stream->write(ACK);
 
-  DriveStatus *status = m_deviceStatusFunc(deviceId);
+  DriveStatus *status = m_driveAccess->deviceStatusFunc(deviceId);
   m_putBytesRemaining = status->sectorSize + 1;
   m_putSectorBufferPtr = m_putSectorBuffer;
-  m_dataFrameReadInProgress = true;
 }
   
 void SIOChannel::doPutSector() {
-  m_dataFrameReadInProgress = false;
-
   int sectorSize = m_putSectorBufferPtr - m_putSectorBuffer - 1;
 
   // calculate checksum
@@ -248,7 +278,7 @@ void SIOChannel::doPutSector() {
 
     // write sector to disk image
     delay(DELAY_T5);
-    if (m_writeSectorFunc(1, getCommandSector(), m_putSectorBuffer, sectorSize)) {
+    if (m_driveAccess->writeSectorFunc(1, getCommandSector(), m_putSectorBuffer, sectorSize)) {
       // send COMPLETE
       m_stream->write(COMPLETE);
     } else {
@@ -262,6 +292,9 @@ void SIOChannel::doPutSector() {
 
     LOG_MSG_CR("Data frame checksum error");
   }
+
+  // change state
+  m_cmdPinState = STATE_WAIT_CMD_START;
 }
 
 void SIOChannel::cmdGetStatus(int deviceId) {
@@ -299,20 +332,17 @@ void SIOChannel::cmdFormat(int deviceId, int density) {
   m_stream->write(ACK);
 
   // perform image format
-  if (m_formatFunc(deviceId, density)) {
+  if (m_driveAccess->formatFunc(deviceId, density)) {
     // send COMPLETE
     delay(DELAY_T5);
     m_stream->write(COMPLETE);
     
-    // send 128 (SD) or 256 (DD) data frame prefixed/suffixed with 0xFF,0xFF
-    int frameLen = (density == DD_SECTOR_SIZE) ? DD_SECTOR_SIZE : SD_SECTOR_SIZE;
-
     LOG_MSG("Sending data frame of length ");
-    LOG_MSG_CR(frameLen);
+    LOG_MSG_CR(SD_SECTOR_SIZE);
 
     m_stream->write(0xFF);
     m_stream->write(0xFF);
-    for (int i=0; i < frameLen - 3; i++) {
+    for (int i=0; i < SD_SECTOR_SIZE - 3; i++) {
       m_stream->write((byte)0x00);
     }
     m_stream->write(0xFF);
@@ -369,5 +399,11 @@ void SIOChannel::dumpCommandFrame() {
 
 unsigned long SIOChannel::getCommandSector() {
   return (unsigned long)(m_cmdFrame.aux2 << 8) + (m_cmdFrame.aux1 & 0xff);
+}
+
+void SIOChannel::resetCommandFrameBuffer() {
+  // reset last command frame info
+  memset(&m_cmdFrame, 0, sizeof(m_cmdFrame));
+  m_cmdFramePtr = (byte*)&m_cmdFrame;
 }
 
