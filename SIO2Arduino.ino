@@ -29,6 +29,9 @@
 #ifdef LCD_DISPLAY
 #include <LiquidCrystal.h>
 #endif
+#ifndef HARDWARE_UART
+#include <SoftwareSerial.h>
+#endif
 
 #define STATE_INIT           1
 #define STATE_WAIT_CMD_START 2
@@ -38,7 +41,12 @@
 // globals
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
 DriveControl driveControl(getFileList, mountFile);
-SIOChannel sioChannel(PIN_ATARI_CMD, &Serial1, &driveAccess, &driveControl);
+#ifdef HARDWARE_UART
+  SIOChannel sioChannel(PIN_ATARI_CMD, &HARDWARE_UART, &driveAccess, &driveControl);
+#else
+  SoftwareSerial serial(PIN_SERIAL_RX, PIN_SERIAL_TX);
+  SIOChannel sioChannel(PIN_ATARI_CMD, &serial, &driveAccess, &driveControl);
+#endif
 #ifdef LCD_DISPLAY
 LiquidCrystal lcd(PIN_LCD_RD,PIN_LCD_ENABLE,PIN_LCD_DB4,PIN_LCD_DB5,PIN_LCD_DB6,PIN_LCD_DB7);
 #endif
@@ -52,7 +60,11 @@ void setup() {
   Serial.begin(115200);
 
   // initialize serial port to Atari
-  Serial1.begin(19200);
+  #ifdef HARDWARE_UART
+    HARDWARE_UART.begin(19200);
+  #else
+    serial.begin(19200);
+  #endif
 
   // set pin modes
   #ifdef SELECTOR_BUTTON

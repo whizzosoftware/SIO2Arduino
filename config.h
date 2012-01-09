@@ -31,12 +31,20 @@
 // uncomment to use a selector button
 #define SELECTOR_BUTTON
 
+// uncomment (and name appropriately) to use a hardware UART for serial communication (e.g. Arduino Mega)
+//#define HARDWARE_UART   Serial1
+
 /*
  * These are the Arduino pin definitions.
  */
  
 #define PIN_ATARI_CMD   2    // the Atari SIO command line
 #define PIN_SD_CARD     4    // the SD card pin
+
+#ifndef HARDWARE_UART
+#define PIN_SERIAL_RX   5
+#define PIN_SERIAL_TX   6
+#endif
 
 #ifdef SELECTOR_BUTTON
 #define PIN_SELECTOR    8    // the selector button pin
