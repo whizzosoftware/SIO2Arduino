@@ -73,12 +73,21 @@
 #endif
 
 #ifdef LCD_DISPLAY
-  #define PIN_LCD_RD          4    // *
-  #define PIN_LCD_ENABLE      5    // *
-  #define PIN_LCD_DB4         9    // * LCD display pins
-  #define PIN_LCD_DB5         8    // *
-  #define PIN_LCD_DB6         7    // *
-  #define PIN_LCD_DB7         6    // *
+  #ifdef ARDUINO_MEGA
+    #define PIN_LCD_RD          5    // *
+    #define PIN_LCD_ENABLE      6    // *
+    #define PIN_LCD_DB4         10   // * LCD display pins
+    #define PIN_LCD_DB5         9    // *
+    #define PIN_LCD_DB6         8    // *
+    #define PIN_LCD_DB7         7    // *
+  #else
+    #define PIN_LCD_RD          4    // *
+    #define PIN_LCD_ENABLE      5    // *
+    #define PIN_LCD_DB4         9    // * LCD display pins
+    #define PIN_LCD_DB5         8    // *
+    #define PIN_LCD_DB6         7    // *
+    #define PIN_LCD_DB7         6    // *
+  #endif
 #endif
 
 // the hardware UART to use for SIO bus communication
