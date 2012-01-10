@@ -25,46 +25,34 @@
 #include "atari.h"
 #include "sio_channel.h"
 #include "disk_drive.h"
-#include "log.h"
 #ifdef LCD_DISPLAY
 #include <LiquidCrystal.h>
 #endif
-#ifndef HARDWARE_UART
-#include <SoftwareSerial.h>
-#endif
 
-#define STATE_INIT           1
-#define STATE_WAIT_CMD_START 2
-#define STATE_READ_CMD       3
-#define STATE_WAIT_CMD_END   4
-
-// globals
+/**
+ * Global variables
+ */
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
 DriveControl driveControl(getFileList, mountFile);
-#ifdef HARDWARE_UART
-  SIOChannel sioChannel(PIN_ATARI_CMD, &HARDWARE_UART, &driveAccess, &driveControl);
-#else
-  SoftwareSerial serial(PIN_SERIAL_RX, PIN_SERIAL_TX);
-  SIOChannel sioChannel(PIN_ATARI_CMD, &serial, &driveAccess, &driveControl);
+SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess, &driveControl);
+File root;
+File file; // TODO: make this unnecessary
+DiskDrive drive1;
+#ifdef SELECTOR_BUTTON
+boolean isSwitchPressed = false;
 #endif
 #ifdef LCD_DISPLAY
 LiquidCrystal lcd(PIN_LCD_RD,PIN_LCD_ENABLE,PIN_LCD_DB4,PIN_LCD_DB5,PIN_LCD_DB6,PIN_LCD_DB7);
 #endif
-File root;
-File file; // TODO: make this unnecessary
-DiskDrive drive1;
-boolean isSwitchPressed = false;
 
 void setup() {
+#ifdef DEBUG
   // set up logging serial port
-  Serial.begin(115200);
+  LOGGING_UART.begin(115200);
+#endif
 
   // initialize serial port to Atari
-  #ifdef HARDWARE_UART
-    HARDWARE_UART.begin(19200);
-  #else
-    serial.begin(19200);
-  #endif
+  SIO_UART.begin(19200);
 
   // set pin modes
   #ifdef SELECTOR_BUTTON
@@ -79,8 +67,8 @@ void setup() {
 
   // initialize SD card
   LOG_MSG("Initializing SD card...");
-  pinMode(PIN_SD_CARD, OUTPUT);
-  if (!SD.begin(PIN_SD_CARD)) {
+  pinMode(PIN_SD_CS, OUTPUT);
+  if (!SD.begin(PIN_SD_CS)) {
     LOG_MSG_CR(" failed.");
     return;
   }
@@ -107,7 +95,7 @@ void loop() {
   #endif
 }
 
-void serialEvent1() {
+void SIO_CALLBACK() {
   // inform the SIO channel that an incoming byte is available
   sioChannel.processIncomingByte();
 }

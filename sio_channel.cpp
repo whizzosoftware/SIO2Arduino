@@ -21,7 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #include "sio_channel.h"
-#include "log.h"
+#include "config.h"
 
 SIOChannel::SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess, DriveControl *driveControl) {
   m_cmdPin = cmdPin;

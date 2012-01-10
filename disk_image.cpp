@@ -21,7 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #include "disk_image.h"
-#include "log.h"
+#include "config.h"
 
 DiskImage::DiskImage() {
   m_fileRef = NULL;
@@ -41,8 +41,13 @@ boolean DiskImage::setFile(File* file) {
   if (loadFile(file)) {
     // create new sector buffer
     m_sectorBuffer.data = (byte*)malloc(sizeof(byte) * m_sectorSize);
-    LOG_MSG_CR(file->name());
-    return true;
+    if (!m_sectorBuffer.data) {
+      LOG_MSG_CR("Unable to allocate memory for sector buffer");
+      return false;
+    } else {
+      LOG_MSG_CR(file->name());
+      return true;
+    }
   } else {
     m_fileRef = NULL;
   }

@@ -21,7 +21,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #include "disk_drive.h"
-#include "log.h"
 
 DiskDrive::DiskDrive() {
   // reset device status
