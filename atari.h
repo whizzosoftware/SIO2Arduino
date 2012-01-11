@@ -16,8 +16,7 @@ const byte DENSITY_ED = 2;
 const byte DENSITY_DD = 3;
 
 const unsigned long SD_SECTOR_SIZE  = 128;
-const unsigned long DD_SECTOR_SIZE  = 256;
-const unsigned long MAX_SECTOR_SIZE = 1024;
+const unsigned long MAX_SECTOR_SIZE = 128;
 
 struct CommandFrame {
   byte deviceId;
@@ -66,7 +65,7 @@ struct SectorPacket {
   StatusFrame statusFrame;
   boolean validStatusFrame;
   boolean error;
-  byte* data;
+  byte data[MAX_SECTOR_SIZE];
   
 };
 

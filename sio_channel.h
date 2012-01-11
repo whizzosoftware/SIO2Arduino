@@ -65,7 +65,7 @@ private:
   byte              m_cmdPinState;
   CommandFrame      m_cmdFrame;
   byte*             m_cmdFramePtr;
-  byte*             m_putSectorBuffer;
+  byte              m_putSectorBuffer[MAX_SECTOR_SIZE];
   byte*             m_putSectorBufferPtr;
   int               m_putBytesRemaining;
   DriveAccess*      m_driveAccess;

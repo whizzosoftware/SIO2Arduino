@@ -31,28 +31,13 @@ boolean DiskImage::setFile(File* file) {
   m_fileRef = file;
   m_fileSize = file->size();
 
-  // free up previous sector buffer if we had one
-  if (m_sectorBuffer.data) {
-    free(m_sectorBuffer.data);
-    m_sectorBuffer.data = NULL;
-  }
-  
   // if image is valid...
   if (loadFile(file)) {
-    // create new sector buffer
-    m_sectorBuffer.data = (byte*)malloc(sizeof(byte) * m_sectorSize);
-    if (!m_sectorBuffer.data) {
-      LOG_MSG_CR("Unable to allocate memory for sector buffer");
-      return false;
-    } else {
-      LOG_MSG_CR(file->name());
-      return true;
-    }
+    return true;
   } else {
     m_fileRef = NULL;
+    return false;
   }
-  
-  return false;
 }
 
 byte DiskImage::getType() {

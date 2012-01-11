@@ -63,6 +63,7 @@ void setup() {
   // set up LCD if appropriate
   lcd.begin(16, 2);
   lcd.print("SIO2Arduino");
+  lcd.setCursor(0,1);
   #endif
 
   // initialize SD card
@@ -70,14 +71,23 @@ void setup() {
   pinMode(PIN_SD_CS, OUTPUT);
   if (!SD.begin(PIN_SD_CS)) {
     LOG_MSG_CR(" failed.");
+    #ifdef LCD_DISPLAY
+      lcd.print("SD Init Error");
+    #endif     
     return;
   }
   root = SD.open("/");
   if (!root) {
     LOG_MSG_CR("Error opening SD card");
+    #ifdef LCD_DISPLAY
+      lcd.print("SD Open Error");
+    #endif     
+  } else {
+    LOG_MSG_CR(" done.");
+    #ifdef LCD_DISPLAY
+      lcd.print("READY");
+    #endif
   }
-  
-  LOG_MSG_CR(" done.");
 }
 
 void loop() {

@@ -28,7 +28,6 @@ SIOChannel::SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess, Dri
   m_stream = stream;
   m_driveAccess = driveAccess;
   m_driveControl = driveControl;
-  m_putSectorBuffer = (byte*)malloc(sizeof(byte) * MAX_SECTOR_SIZE);
 
   // set command pin to be read
   pinMode(m_cmdPin, INPUT);

@@ -52,16 +52,17 @@
  
 #define PIN_ATARI_CMD         2    // the Atari SIO command line - usually the purple wire on the SIO cable
 
+// for now, you can't change these pin definitions
 #ifdef ETHERNET_SHIELD
   #define PIN_SD_CS           4    // the SD CS line
 #else
   #ifdef ARDUINO_MEGA
-    #define PIN_SD_CS         53   // the SD breakout board's CD (card detect) pin
-    #define PIN_SD_DI         52   // the SD breakout board's DI pin
-    #define PIN_SD_DO         51   // the SD breakout board's DO pin
-    #define PIN_SD_CLK        50   // the SD breakout board's CLK pin
+    #define PIN_SD_CS         53   // the SD breakout board's CS (chip select) pin
+    #define PIN_SD_DI         51   // the SD breakout board's DI pin
+    #define PIN_SD_DO         50   // the SD breakout board's DO pin
+    #define PIN_SD_CLK        52   // the SD breakout board's CLK pin
   #else
-    #define PIN_SD_CS         10   // the SD breakout board's CD (card detect) pin
+    #define PIN_SD_CS         10   // the SD breakout board's CS (chip select) pin
     #define PIN_SD_DI         11   // the SD breakout board's DI pin
     #define PIN_SD_DO         12   // the SD breakout board's DO pin
     #define PIN_SD_CLK        13   // the SD breakout board's CLK pin
