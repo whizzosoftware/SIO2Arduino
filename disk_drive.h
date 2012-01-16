@@ -11,11 +11,11 @@ class DiskDrive {
 public:
   DiskDrive();
   DriveStatus* getStatus();
-  boolean setImageFile(File* file);
+  boolean setImageFile(SdFile* file);
   unsigned long getImageSectorSize();
   SectorPacket* getSectorData(unsigned long sector);
-  boolean writeSectorData(unsigned long sector, byte* data, unsigned long len);
-  boolean formatImage(File* file, int density);
+  unsigned long writeSectorData(unsigned long sector, byte* data, unsigned long len);
+  boolean formatImage(SdFile* file, int density);
   boolean hasImage();
 private:
   DriveStatus  m_driveStatus;

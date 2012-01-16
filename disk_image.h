@@ -2,7 +2,8 @@
 #define DISK_IMAGE_h
 
 #include <Arduino.h>
-#include <SD.h>
+#include <SdFat.h>
+#include <SdFatUtil.h>
 #include "atari.h"
 
 const byte TYPE_ATR = 1;
@@ -75,19 +76,19 @@ struct PROSectorHeader {
 class DiskImage {
 public:
   DiskImage();
-  boolean setFile(File* file);
+  boolean setFile(SdFile* file);
   byte getType();
   unsigned long getSectorSize();
   SectorPacket* getSectorData(unsigned long sector);
-  boolean writeSectorData(unsigned long, byte* data, unsigned long size);
-  boolean format(File *file, int density);
+  unsigned long writeSectorData(unsigned long, byte* data, unsigned long size);
+  boolean format(SdFile *file, int density);
   boolean isEnhancedDensity();
   boolean isDoubleDensity();
   boolean isReadOnly();
   boolean hasImage();
 private:
-  boolean loadFile(File* file);
-  File*            m_fileRef;
+  boolean loadFile(SdFile* file);
+  SdFile*          m_fileRef;
   byte             m_type;
   unsigned long    m_fileSize;
   boolean          m_readOnly;

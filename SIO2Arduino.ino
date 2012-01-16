@@ -21,7 +21,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #include "config.h"
-#include <SD.h>
+#include <SdFat.h>
+#include <SdFatUtil.h>
 #include "atari.h"
 #include "sio_channel.h"
 #include "disk_drive.h"
@@ -34,11 +35,15 @@
  */
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
 SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess);
-File root;
-File file; // TODO: make this unnecessary
+Sd2Card card;
+SdVolume volume;
+SdFile root;
+SdFile file; // TODO: make this unnecessary
 DiskDrive drive1;
 #ifdef SELECTOR_BUTTON
 boolean isSwitchPressed = false;
+unsigned long lastSelectionPress;
+boolean isFileOpened;
 #endif
 #ifdef LCD_DISPLAY
 LiquidCrystal lcd(PIN_LCD_RD,PIN_LCD_ENABLE,PIN_LCD_DB4,PIN_LCD_DB5,PIN_LCD_DB6,PIN_LCD_DB7);
@@ -68,25 +73,35 @@ void setup() {
   // initialize SD card
   LOG_MSG("Initializing SD card...");
   pinMode(PIN_SD_CS, OUTPUT);
-  if (!SD.begin(PIN_SD_CS)) {
+
+  if (!card.init(SPI_HALF_SPEED, PIN_SD_CS)) {
     LOG_MSG_CR(" failed.");
     #ifdef LCD_DISPLAY
       lcd.print("SD Init Error");
     #endif     
     return;
   }
-  root = SD.open("/");
-  if (!root) {
-    LOG_MSG_CR("Error opening SD card");
+  
+  if (!volume.init(&card)) {
+    LOG_MSG_CR(" failed.");
     #ifdef LCD_DISPLAY
-      lcd.print("SD Open Error");
+      lcd.print("SD Volume Error");
     #endif     
-  } else {
-    LOG_MSG_CR(" done.");
-    #ifdef LCD_DISPLAY
-      lcd.print("READY");
-    #endif
+    return;
   }
+
+  if (!root.openRoot(&volume)) {
+    LOG_MSG_CR(" failed.");
+    #ifdef LCD_DISPLAY
+      lcd.print("SD Root Error");
+    #endif     
+    return;
+  }
+
+  LOG_MSG_CR(" done.");
+  #ifdef LCD_DISPLAY
+    lcd.print("READY");
+  #endif
 }
 
 void loop() {
@@ -94,12 +109,10 @@ void loop() {
   sioChannel.runCycle();
   
   #ifdef SELECTOR_BUTTON
-  // watch the selector button
-  if (digitalRead(PIN_SELECTOR) == HIGH && !isSwitchPressed) {
-    isSwitchPressed = true;
+  // watch the selector button (accounting for debounce)
+  if (digitalRead(PIN_SELECTOR) == HIGH && millis() - lastSelectionPress > 250) {
+    lastSelectionPress = millis();
     changeDisk();
-  } else if (digitalRead(PIN_SELECTOR) == LOW && isSwitchPressed) {
-    isSwitchPressed = false;
   }
   #endif
 }
@@ -121,23 +134,28 @@ SectorPacket* readSector(int deviceId, unsigned long sector) {
   }
 }
 
-boolean writeSector(int deviceId, unsigned long sector, byte* data, unsigned long size) {
-  return drive1.writeSectorData(sector, data, size);
+boolean writeSector(int deviceId, unsigned long sector, byte* data, unsigned long length) {
+  return (drive1.writeSectorData(sector, data, length) == length);
 }
 
 boolean format(int deviceId, int density) {
+  char name[13];
+  
+  // get current filename
+  file.getFilename(name);
+
   // close and delete the current file
   file.close();
-  SD.remove(file.name());
+  file.remove();
 
   LOG_MSG("Remove old file: ");
-  LOG_MSG_CR(file.name());
+  LOG_MSG_CR(name);
 
   // open new file for writing
-  file = SD.open(file.name(), FILE_WRITE);
+  file.open(&root, name, O_RDWR | O_SYNC | O_CREAT);
 
   LOG_MSG("Created new file: ");
-  LOG_MSG_CR(file.name());
+  LOG_MSG_CR(name);
 
   // allow the virtual drive to format the image (and possibly alter its size)
   if (drive1.formatImage(&file, density)) {
@@ -146,32 +164,66 @@ boolean format(int deviceId, int density) {
     return true;
   } else {
     return false;
-  }
+  }  
 }
 
 void changeDisk() {
+  dir_t dir;
+  char name[13];
   boolean imageChanged = false;
 
   while (!imageChanged) {
-    if (file) {
+    // close previously opened file
+    if (file.isOpen()) {
       file.close();
     }
 
-    file = root.openNextFile();
-
-    if (!file) {
-      root.rewindDirectory();
-      file = root.openNextFile();
+    // get next dir entry
+    int8_t result = root.readDir((dir_t*)&dir);
+    
+    // if we got back a 0, rewind the directory and get the first dir entry
+    if (!result) {
+      root.rewind();
+      result = root.readDir((dir_t*)&dir);
     }
+    
+    // if we have a valid file response code, open it
+    if (result > 0 && isValidFilename((char*)&dir.name)) {
+      createFilename(name, dir.name);
+      if (file.open(&root, name, O_RDWR | O_SYNC) && drive1.setImageFile(&file)) {
+        LOG_MSG_CR(name);
 
-    file = SD.open(file.name(), FILE_WRITE);
-    imageChanged = drive1.setImageFile(&file);
+        #ifdef LCD_DISPLAY
+        lcd.clear();
+        lcd.print(name);
+        lcd.setCursor(0,1);
+        #endif
+
+        imageChanged = true;
+      }
+    }
   }
+}
 
-  LOG_MSG_CR(file.name());
-  
-  #ifdef LCD_DISPLAY
-  lcd.clear();
-  lcd.print(file.name());
-  #endif
+boolean isValidFilename(char *s) {
+  return (  s[0] != '.' &&    // ignore hidden directories 
+            s[0] != '_' && (  // ignore bogus files created by OS X
+              (s[8] == 'A' && s[9] == 'T' && s[10] == 'R') || 
+              (s[8] == 'P' && s[9] == 'R' && s[10] == 'O') || 
+              (s[8] == 'X' && s[9] == 'F' && s[10] == 'D')
+            )
+         );
+}
+
+void createFilename(char* filename, uint8_t* name) {
+  for (int i=0; i < 8; i++) {
+    if (name[i] != ' ') {
+      *(filename++) = name[i];
+    }
+  }
+  *(filename++) = '.';
+  *(filename++) = name[8];
+  *(filename++) = name[9];
+  *(filename++) = name[10];
+  *(filename++) = '\0';
 }

@@ -176,9 +176,9 @@ boolean SIOChannel::isValidAuxData() {
   return true;
 }
 
-byte SIOChannel::checksum(byte* chunk, int size) {
+byte SIOChannel::checksum(byte* chunk, int length) {
   int chkSum = 0;
-  for(int i=0; i < size; i++) {
+  for(int i=0; i < length; i++) {
     chkSum = ((chkSum+chunk[i])>>8) + ((chkSum+chunk[i])&0xff);
   }
   return (byte)chkSum;
@@ -318,7 +318,6 @@ void SIOChannel::cmdGetStatus(int deviceId) {
     b++;
   }
   m_stream->write(chksum);
-  
 }
 
 void SIOChannel::cmdFormat(int deviceId, int density) {

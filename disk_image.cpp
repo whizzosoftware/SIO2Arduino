@@ -27,9 +27,9 @@ DiskImage::DiskImage() {
   m_fileRef = NULL;
 }
 
-boolean DiskImage::setFile(File* file) {
+boolean DiskImage::setFile(SdFile* file) {
   m_fileRef = file;
-  m_fileSize = file->size();
+  m_fileSize = file->fileSize();
 
   // if image is valid...
   if (loadFile(file)) {
@@ -59,7 +59,7 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
   // seek to proper offset in file
   if (m_type == TYPE_PRO) {
     // if this is a PRO image, we seek based on the sector number + the sector header size (omitting the header)
-    m_fileRef->seek(m_headerSize + ((sector - 1) * (m_sectorSize + sizeof(PROSectorHeader))));
+    m_fileRef->seekSet(m_headerSize + ((sector - 1) * (m_sectorSize + sizeof(PROSectorHeader))));
 
     // then we read the sector header
     for (int i=0; i < sizeof(PROSectorHeader); i++) {
@@ -76,13 +76,13 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
     } else {
       // if there are phantom sector(s) associated with this sector, decide what to return
       if (m_usePhantoms && m_proSectorHeader.totalPhantoms > 0 && m_phantomFlip) {
-        m_fileRef->seek(m_headerSize + (((720 + m_proSectorHeader.phantom1) - 1) * (m_sectorSize + sizeof(PROSectorHeader))) + sizeof(PROSectorHeader));
+        m_fileRef->seekSet(m_headerSize + (((720 + m_proSectorHeader.phantom1) - 1) * (m_sectorSize + sizeof(PROSectorHeader))) + sizeof(PROSectorHeader));
       }
     }
     m_phantomFlip = !m_phantomFlip; // TODO: do bad sectors cause this to flip?
   } else {
     // if this is an ATR image, we seek based on the sector number (omitting the header)
-    m_fileRef->seek(m_headerSize + ((sector - 1) * m_sectorSize));
+    m_fileRef->seekSet(m_headerSize + ((sector - 1) * m_sectorSize));
   }
 
   // delay if necessary
@@ -101,16 +101,14 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
 /**
  * Write data to drive image.
  */
-boolean DiskImage::writeSectorData(unsigned long sector, byte* data, unsigned long len) {
+unsigned long DiskImage::writeSectorData(unsigned long sector, byte* data, unsigned long len) {
   if (!m_readOnly) {
     // seek to proper offset in file
     unsigned long offset = m_headerSize + ((sector - 1) * m_sectorSize);
-    m_fileRef->seek(offset);
+    m_fileRef->seekSet(offset);
   
     // write the data
-    unsigned long wrote = m_fileRef->write(data, len);
-    m_fileRef->flush();
-    return (wrote == len);
+    return m_fileRef->write(data, len);
   }
   
   return false;
@@ -119,7 +117,7 @@ boolean DiskImage::writeSectorData(unsigned long sector, byte* data, unsigned lo
 /**
  * Format drive image.
  */
-boolean DiskImage::format(File *file, int density) {
+boolean DiskImage::format(SdFile *file, int density) {
   if (!m_readOnly) {
     // determine file length
     unsigned long length = FORMAT_SS_SD_40;
@@ -128,7 +126,7 @@ boolean DiskImage::format(File *file, int density) {
     }
   
     // make sure we're at beginning of file
-    file->seek(0);
+    file->seekSet(0);
   
     // if disk is an ATR, write the header
     if (m_type == TYPE_ATR) {
@@ -144,7 +142,6 @@ boolean DiskImage::format(File *file, int density) {
     for (unsigned long i=0; i < length; i++) {
       file->write((byte)0);
     }
-    file->flush();
   
     return true;
   }
@@ -152,16 +149,18 @@ boolean DiskImage::format(File *file, int density) {
   return false;
 }
 
-boolean DiskImage::loadFile(File *file) {
+boolean DiskImage::loadFile(SdFile *file) {
+  char filename[13];
+  
   // make sure we're at the beginning of file
-  file->seek(0);
+  file->seekSet(0);
   
   // read first 16 bytes of file & rewind again
   byte header[16];
   for (int i=0; i < 16; i++) {
     header[i] = (byte)file->read();
   }
-  file->seek(0);
+  file->seekSet(0);
   
   // check if it's an ATR
   ATRHeader* atrHeader = (ATRHeader*)&header;
@@ -214,7 +213,7 @@ boolean DiskImage::loadFile(File *file) {
 
   // check if it's an XFD
   // (since an XFD is just a raw data dump, we can only determine this by file name and size)
-  char *filename = file->name();
+  file->getFilename((char*)&filename);
   int len = strlen(filename);
   char *extension = filename + len - 4;
   if ((!strcmp(".XFD", extension) || !strcmp(".xfd", extension)) && (m_fileSize == FORMAT_SS_SD_40)) {

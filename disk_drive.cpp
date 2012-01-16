@@ -35,7 +35,7 @@ DriveStatus* DiskDrive::getStatus() {
   return &m_driveStatus;
 }
 
-boolean DiskDrive::setImageFile(File *file) {
+boolean DiskDrive::setImageFile(SdFile *file) {
   boolean result = m_diskImage.setFile(file);
   if (result) {
     // set device status
@@ -73,11 +73,11 @@ SectorPacket* DiskDrive::getSectorData(unsigned long sector) {
   }
 }
 
-boolean DiskDrive::writeSectorData(unsigned long sector, byte *data, unsigned long len) {
+unsigned long DiskDrive::writeSectorData(unsigned long sector, byte *data, unsigned long len) {
   return m_diskImage.writeSectorData(sector, data, len);
 }
 
-boolean DiskDrive::formatImage(File *file, int density) {
+boolean DiskDrive::formatImage(SdFile *file, int density) {
   return m_diskImage.format(file, density);
 }
 
