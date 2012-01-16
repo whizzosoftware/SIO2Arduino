@@ -23,11 +23,10 @@
 #include "sio_channel.h"
 #include "config.h"
 
-SIOChannel::SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess, DriveControl *driveControl) {
+SIOChannel::SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess) {
   m_cmdPin = cmdPin;
   m_stream = stream;
   m_driveAccess = driveAccess;
-  m_driveControl = driveControl;
 
   // set command pin to be read
   pinMode(m_cmdPin, INPUT);
@@ -306,7 +305,7 @@ void SIOChannel::cmdGetStatus(int deviceId) {
   m_stream->write(COMPLETE);
 
   // get device status
-  DriveStatus* driveStatus = m_deviceStatusFunc(deviceId);
+  DriveStatus* driveStatus = m_driveAccess->deviceStatusFunc(deviceId);
 
   // calculate checksum
   int frameLength = sizeof(driveStatus->statusFrame);
