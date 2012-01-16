@@ -33,8 +33,7 @@
  * Global variables
  */
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
-DriveControl driveControl(getFileList, mountFile);
-SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess, &driveControl);
+SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess);
 File root;
 File file; // TODO: make this unnecessary
 DiskDrive drive1;
@@ -168,6 +167,8 @@ void changeDisk() {
     file = SD.open(file.name(), FILE_WRITE);
     imageChanged = drive1.setImageFile(&file);
   }
+
+  LOG_MSG_CR(file.name());
   
   #ifdef LCD_DISPLAY
   lcd.clear();

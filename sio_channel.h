@@ -37,7 +37,7 @@ const byte DEVICE_R1            = 0x50;
 
 class SIOChannel {
 public:
-  SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess, DriveControl *driveControl);
+  SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess);
   void runCycle();
   void processIncomingByte();
   void sendDeviceStatus(DriveStatus *deviceStatus);
@@ -69,7 +69,6 @@ private:
   byte*             m_putSectorBufferPtr;
   int               m_putBytesRemaining;
   DriveAccess*      m_driveAccess;
-  DriveControl*     m_driveControl;
   unsigned long     m_startTimeoutInterval;
 };
 
