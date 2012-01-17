@@ -23,10 +23,13 @@
 #include "sio_channel.h"
 #include "config.h"
 
-SIOChannel::SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess) {
+SIOChannel::SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess, DriveControl *driveControl) {
   m_cmdPin = cmdPin;
   m_stream = stream;
   m_driveAccess = driveAccess;
+  m_driveControl = driveControl;
+  
+  m_sdriveHandler.setDriveControl(m_driveControl);
 
   // set command pin to be read
   pinMode(m_cmdPin, INPUT);
@@ -148,28 +151,40 @@ boolean SIOChannel::isChecksumValid() {
 
 boolean SIOChannel::isCommandForThisDevice() {
   // we only emulate drive 1 right now
-  return (m_cmdFrame.deviceId == DEVICE_D1);
+  return (m_cmdFrame.deviceId == DEVICE_D1 || m_cmdFrame.deviceId == DEVICE_SDRIVE);
 }
 
 boolean SIOChannel::isValidCommand() {
-  return (m_cmdFrame.command == CMD_READ || 
-          m_cmdFrame.command == CMD_WRITE ||
-          m_cmdFrame.command == CMD_STATUS ||
-          m_cmdFrame.command == CMD_PUT ||
-          m_cmdFrame.command == CMD_FORMAT ||
-          m_cmdFrame.command == CMD_FORMAT_MD);
+  boolean result = (m_cmdFrame.command == CMD_READ || 
+                    m_cmdFrame.command == CMD_WRITE ||
+                    m_cmdFrame.command == CMD_STATUS ||
+                    m_cmdFrame.command == CMD_PUT ||
+                    m_cmdFrame.command == CMD_FORMAT ||
+                    m_cmdFrame.command == CMD_FORMAT_MD);
+
+  if (!result) {
+    result = m_sdriveHandler.isValidCommand(m_cmdFrame.command);
+  }
+  
+  return result;
 }
 
 boolean SIOChannel::isValidDevice(byte b) {
-  return (b == DEVICE_D1 ||
-          b == DEVICE_D2 ||
-          b == DEVICE_D3 ||
-          b == DEVICE_D4 ||
-          b == DEVICE_D5 ||
-          b == DEVICE_D6 ||
-          b == DEVICE_D7 ||
-          b == DEVICE_D8 ||
-          b == DEVICE_R1);
+  boolean result = (b == DEVICE_D1 ||
+                    b == DEVICE_D2 ||
+                    b == DEVICE_D3 ||
+                    b == DEVICE_D4 ||
+                    b == DEVICE_D5 ||
+                    b == DEVICE_D6 ||
+                    b == DEVICE_D7 ||
+                    b == DEVICE_D8 ||
+                    b == DEVICE_R1);
+
+  if (!result) {
+    result = m_sdriveHandler.isValidDevice(b);
+  }
+  
+  return result;
 }
 
 boolean SIOChannel::isValidAuxData() {
@@ -206,6 +221,9 @@ byte SIOChannel::processCommand() {
       break;
     case CMD_FORMAT_MD:
       cmdFormat(deviceId, DENSITY_ED);
+      break;
+    default:
+      m_sdriveHandler.processCommand(&m_cmdFrame, m_stream);
       break;
   }
   
@@ -288,7 +306,10 @@ void SIOChannel::doPutSector() {
     delay(DELAY_T4);
     m_stream->write(NAK);
 
-    LOG_MSG_CR("Data frame checksum error");
+    LOG_MSG("Data frame checksum error: ");
+    LOG_MSG(chksum, HEX);
+    LOG_MSG(" vs. ");
+    LOG_MSG_CR(m_putSectorBuffer[sectorSize], HEX);
   }
 
   // change state
@@ -348,6 +369,8 @@ void SIOChannel::cmdFormat(int deviceId, int density) {
 }
 
 void SIOChannel::dumpCommandFrame() {
+// we only compile this on DEBUG to save allocating string constants
+#ifdef DEBUG
   LOG_MSG(m_cmdFrame.deviceId, HEX);
   LOG_MSG(" ");
   LOG_MSG(m_cmdFrame.command, HEX);
@@ -385,10 +408,13 @@ void SIOChannel::dumpCommandFrame() {
       LOG_MSG("FORMAT MD");
       break;
     default:
-      LOG_MSG("??");
+      if (!m_sdriveHandler.printCmdName(m_cmdFrame.command)) {
+        LOG_MSG("??");
+      }
   }
   
   LOG_MSG_CR();
+#endif  
 }
 
 unsigned long SIOChannel::getCommandSector() {

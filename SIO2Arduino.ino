@@ -34,7 +34,8 @@
  * Global variables
  */
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
-SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess);
+DriveControl driveControl(getFileList, mountFileIndex);
+SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess, &driveControl);
 Sd2Card card;
 SdVolume volume;
 SdFile root;
@@ -173,11 +174,6 @@ void changeDisk() {
   boolean imageChanged = false;
 
   while (!imageChanged) {
-    // close previously opened file
-    if (file.isOpen()) {
-      file.close();
-    }
-
     // get next dir entry
     int8_t result = root.readDir((dir_t*)&dir);
     
@@ -189,18 +185,8 @@ void changeDisk() {
     
     // if we have a valid file response code, open it
     if (result > 0 && isValidFilename((char*)&dir.name)) {
-      createFilename(name, dir.name);
-      if (file.open(&root, name, O_RDWR | O_SYNC) && drive1.setImageFile(&file)) {
-        LOG_MSG_CR(name);
-
-        #ifdef LCD_DISPLAY
-        lcd.clear();
-        lcd.print(name);
-        lcd.setCursor(0,1);
-        #endif
-
-        imageChanged = true;
-      }
+      createFilename(name, (char*)dir.name);
+      imageChanged = mountFilename(name);
     }
   }
 }
@@ -215,7 +201,7 @@ boolean isValidFilename(char *s) {
          );
 }
 
-void createFilename(char* filename, uint8_t* name) {
+void createFilename(char* filename, char* name) {
   for (int i=0; i < 8; i++) {
     if (name[i] != ' ') {
       *(filename++) = name[i];
@@ -226,4 +212,55 @@ void createFilename(char* filename, uint8_t* name) {
   *(filename++) = name[9];
   *(filename++) = name[10];
   *(filename++) = '\0';
+}
+
+void getFileList(int page, int count, FileEntry *entries) {
+  dir_t dir;
+  
+  root.rewind();
+
+  int ix = 0;
+  while (ix < count) {
+    if (root.readDir((dir_t*)&dir) < 1) {
+      break;
+    }
+    if (isValidFilename((char*)&dir.name)) {
+      memcpy(entries[ix++].name, dir.name, 11);
+    }
+  }
+}
+
+void mountFileIndex(int deviceId, int ix, int count) {
+  FileEntry entries[count];
+  char name[13];
+
+  // figure out what filename is associated with the index
+  getFileList(ix, count, entries);
+
+  // build a full 8.3 filename
+  createFilename(name, entries[ix].name);
+
+  // mount the image
+  mountFilename(name);
+}
+
+boolean mountFilename(char *name) {
+  // close previously open file
+  if (file.isOpen()) {
+    file.close();
+  }
+  
+  if (file.open(&root, name, O_RDWR | O_SYNC) && drive1.setImageFile(&file)) {
+    LOG_MSG_CR(name);
+
+    #ifdef LCD_DISPLAY
+    lcd.clear();
+    lcd.print(name);
+    lcd.setCursor(0,1);
+    #endif
+
+    return true;
+  }
+  
+  return false;
 }

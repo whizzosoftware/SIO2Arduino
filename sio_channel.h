@@ -5,6 +5,7 @@
 #include "atari.h"
 #include "drive_access.h"
 #include "drive_control.h"
+#include "sdrive.h"
 
 const byte COMMAND_FRAME_SIZE   = 5;
 
@@ -37,7 +38,7 @@ const byte DEVICE_R1            = 0x50;
 
 class SIOChannel {
 public:
-  SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess);
+  SIOChannel(int cmdPin, Stream* stream, DriveAccess *driveAccess, DriveControl *driveControl);
   void runCycle();
   void processIncomingByte();
   void sendDeviceStatus(DriveStatus *deviceStatus);
@@ -69,6 +70,8 @@ private:
   byte*             m_putSectorBufferPtr;
   int               m_putBytesRemaining;
   DriveAccess*      m_driveAccess;
+  DriveControl*     m_driveControl;
+  SDriveHandler     m_sdriveHandler;
   unsigned long     m_startTimeoutInterval;
 };
 

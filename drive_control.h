@@ -2,15 +2,15 @@
 #define DRIVE_CONTROL_h
 
 struct FileEntry {
-  char* name;
+  char name[11];
 };
 
 class DriveControl {
 public:
-  DriveControl(FileEntry**(*getFileList)(int,int), void(*mountFile)(int,int));
+  DriveControl(void(*getFileList)(int,int,FileEntry*), void(*mountFile)(int,int,int));
 
-  FileEntry**(*getFileList)(int,int);
-  void(*mountFile)(int,int);
+  void(*getFileList)(int,int,FileEntry*);
+  void(*mountFile)(int,int,int);
 };
 
 #endif

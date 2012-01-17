@@ -22,7 +22,7 @@
 */
 #include "drive_control.h"
 
-DriveControl::DriveControl(FileEntry**(*a)(int,int), void(*b)(int,int)) {
+DriveControl::DriveControl(void(*a)(int,int,FileEntry*), void(*b)(int,int,int)) {
   getFileList = a;
   mountFile = b;
 }
