@@ -42,6 +42,9 @@
 // uncomment if using an Ethernet sheild for SD capabilities
 //#define ETHERNET_SHIELD
 
+// uncomment for ATX image format support (Mega 2560 only)
+//#define ATX_IMAGES
+
 // uncomment this to enable debug logging -- make sure the HARDWARE_UART isn't the same as
 // the LOGGING_UART defined at the bottom of the file
 #define DEBUG 

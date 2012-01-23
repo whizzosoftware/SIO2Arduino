@@ -197,6 +197,9 @@ boolean isValidFilename(char *s) {
               (s[8] == 'A' && s[9] == 'T' && s[10] == 'R') || 
               (s[8] == 'P' && s[9] == 'R' && s[10] == 'O') || 
               (s[8] == 'X' && s[9] == 'F' && s[10] == 'D')
+#ifdef ATX_IMAGES              
+              || (s[8] == 'A' && s[9] == 'T' && s[10] == 'X')
+#endif              
             )
          );
 }

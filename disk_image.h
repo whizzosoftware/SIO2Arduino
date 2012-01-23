@@ -5,10 +5,12 @@
 #include <SdFat.h>
 #include <SdFatUtil.h>
 #include "atari.h"
+#include "config.h"
 
 const byte TYPE_ATR = 1;
 const byte TYPE_XFD = 2;
 const byte TYPE_PRO = 3;
+const byte TYPE_ATX = 4;
 
 const unsigned long SECTOR_SIZE_SD  = 128;
 
@@ -18,6 +20,14 @@ const unsigned long FORMAT_SS_ED_35 = 116480;
 const unsigned long FORMAT_SS_ED_40 = 133120;
 const unsigned long FORMAT_SS_DD_35 = 160896;
 const unsigned long FORMAT_SS_DD_40 = 183936;
+
+#ifdef ATX_IMAGES
+struct ATXSectorHeader {
+  unsigned int sectorNumber;
+  unsigned long fileIndex;
+  byte sstatus;
+};
+#endif
 
 // ATR format
 #define ATR_SIGNATURE 0x0296
@@ -61,6 +71,7 @@ struct PROFileHeader {
   byte o;
   byte p;
 };
+
 struct PROSectorHeader {
   StatusFrame statusFrame;
   byte m;
@@ -86,6 +97,7 @@ public:
   boolean isDoubleDensity();
   boolean isReadOnly();
   boolean hasImage();
+  boolean hasCopyProtection();
 private:
   boolean loadFile(SdFile* file);
   SdFile*          m_fileRef;
@@ -100,6 +112,9 @@ private:
   PROSectorHeader  m_proSectorHeader;
   boolean          m_usePhantoms;
   boolean          m_phantomFlip;
+#ifdef ATX_IMAGES
+  ATXSectorHeader  m_sectorHeaders[720];
+#endif
 };
 
 #endif

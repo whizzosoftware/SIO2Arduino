@@ -80,8 +80,43 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
       }
     }
     m_phantomFlip = !m_phantomFlip; // TODO: do bad sectors cause this to flip?
+#ifdef ATX_IMAGES
+  } else if (m_type == TYPE_ATX) {
+    int ix = -1;
+    for (int i=0; i < 720; i++) {
+      if (m_sectorHeaders[i].sectorNumber == (sector-1)) {
+        ix = i;
+        if (!m_phantomFlip) {
+          break;
+        }
+      }
+    }
+    m_sectorBuffer.validStatusFrame = true;
+    if (ix > -1) {
+      m_fileRef->seekSet(m_sectorHeaders[ix].fileIndex);
+      if (m_sectorHeaders[ix].sstatus > 0) {
+        m_sectorBuffer.error = true;
+      }
+      // hardware status bits for floppy controller are active low, so bit flip
+      *((byte*)&m_sectorBuffer.statusFrame.hardwareStatus) = ~(m_sectorHeaders[ix].sstatus);
+      *((byte*)&m_sectorBuffer.statusFrame.commandStatus) = 0x10;
+      *(&m_sectorBuffer.statusFrame.timeout_lsb) = 0xE0;
+    } else {
+      // TODO: right now we just send back a random data frame -- is this correct?
+      m_fileRef->seekSet(0);
+      m_sectorBuffer.error = true;
+      // set the missing sector data bit (active low)
+      *((byte*)&m_sectorBuffer.statusFrame.hardwareStatus) = 0xF7;
+      *((byte*)&m_sectorBuffer.statusFrame.commandStatus) = 0x10;
+      *(&m_sectorBuffer.statusFrame.timeout_lsb) = 0xE0;
+    }
+    // for now, do the same global flip of duplicate sector data as PRO
+    // (alternate between duplicate sectors on successive reads)
+    // TODO: this should be based on timing of sector angular position
+    m_phantomFlip = !m_phantomFlip;
+#endif
   } else {
-    // if this is an ATR image, we seek based on the sector number (omitting the header)
+    // if this is an ATR or XFD image, we seek based on the sector number (omitting the header)
     m_fileRef->seekSet(m_headerSize + ((sector - 1) * m_sectorSize));
   }
 
@@ -211,6 +246,100 @@ boolean DiskImage::loadFile(SdFile *file) {
     return true;
   }
 
+#ifdef ATX_IMAGES
+  // check if it's an ATX
+  if (header[0] == 'A' && header[1] == 'T' && header[2] == '8' && header[3] == 'X') {
+    m_type = TYPE_ATX;
+    m_readOnly = true;
+    m_sectorReadDelay = 0;
+    m_sectorSize = 128;
+    m_phantomFlip = false;
+
+    unsigned long trackRecordSize;
+    unsigned long l2;
+    unsigned long fileIndex;
+
+    // start with all sector numbers impossibly high (for a floppy disk)
+    for (int i=0; i < 720; i++) {
+      m_sectorHeaders[i].sectorNumber = 60000;
+    }
+
+    // read header size
+    file->seekSet(28);
+    fileIndex = file->read() + file->read() * 256 + file->read() * 512 + file->read() * 768;
+    // skip to first track record
+    file->seekSet(fileIndex);
+
+    // NOTE: we're doing multiple file->read() statements to avoid creating any additional
+    // heap variables (we have a lot more available program space than heap space)
+
+    for (int i=0; i < 40; i++) {
+      // read track header
+      trackRecordSize = file->read();
+      trackRecordSize += file->read() * 256;
+      trackRecordSize += file->read() * 512;
+      trackRecordSize += file->read() * 768;
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      byte trackNumber = file->read();
+      file->read();
+      int sectorCount = file->read();
+      sectorCount += file->read() * 256;
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      l2 = file->read();
+      l2 += file->read() * 256;
+      l2 += file->read() * 512;
+      l2 += file->read() * 768;
+      
+      // seek to beginning of sector list
+      file->seekSet(fileIndex + l2);
+      
+      // skip sector list header
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      file->read();
+      
+      // read each sector
+      for (int i2=0; i2< sectorCount; i2++) {
+        byte sectorNum = file->read();
+        byte sectorStatus = file->read();
+        // skip sector position
+        file->read();
+        file->read();
+        // read start data pos
+        l2 = file->read();
+        l2 += file->read() * 256;
+        l2 += file->read() * 512;
+        l2 += file->read() * 768;
+        m_sectorHeaders[trackNumber * 18 + i2].sectorNumber = (trackNumber * 18) + (sectorNum - 1);
+        m_sectorHeaders[trackNumber * 18 + i2].sstatus = sectorStatus;
+        m_sectorHeaders[trackNumber * 18 + i2].fileIndex = fileIndex + l2;
+      }
+
+      // move to next track record
+      fileIndex += trackRecordSize;
+      file->seekSet(fileIndex);
+    }
+
+    LOG_MSG("Loaded ATX with sector size 128: ");
+    return true;
+  }  
+#endif
+
   // check if it's an XFD
   // (since an XFD is just a raw data dump, we can only determine this by file name and size)
   file->getFilename((char*)&filename);
@@ -235,6 +364,10 @@ boolean DiskImage::hasImage() {
   return (m_fileRef != NULL);
 }
 
+boolean DiskImage::hasCopyProtection() {
+  return (m_type == TYPE_PRO || m_type == TYPE_ATX);
+}
+
 boolean DiskImage::isEnhancedDensity() {
   return (m_fileSize == FORMAT_SS_ED_35 + m_headerSize || m_fileSize == FORMAT_SS_ED_40 + m_headerSize);
 }
@@ -246,3 +379,4 @@ boolean DiskImage::isDoubleDensity() {
 boolean DiskImage::isReadOnly() {
   return m_readOnly;
 }
+

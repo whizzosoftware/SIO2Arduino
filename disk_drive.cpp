@@ -58,9 +58,9 @@ SectorPacket* DiskDrive::getSectorData(unsigned long sector) {
       memcpy(&m_driveStatus.statusFrame, &(packet->statusFrame), sizeof(m_driveStatus.statusFrame));
     }
     
-    // for PRO images, make read time consistent across all sector reads to 
+    // for images with copy-protection, make read time consistent across all sector reads to 
     // allow skew-based protection to work
-    if (m_diskImage.getType() == TYPE_PRO) {
+    if (m_diskImage.hasCopyProtection()) {
       unsigned long time = micros() - startTime;
       unsigned long delta = (MIN_PRO_SECTOR_READ * ((time - 1) / MIN_PRO_SECTOR_READ + 1)) - time;
       delay(delta / 1000);             // Arduino's delayMicroseconds() can't reliably 
