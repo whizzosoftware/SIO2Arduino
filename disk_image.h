@@ -11,6 +11,7 @@ const byte TYPE_ATR = 1;
 const byte TYPE_XFD = 2;
 const byte TYPE_PRO = 3;
 const byte TYPE_ATX = 4;
+const byte TYPE_XEX = 5;
 
 const unsigned long SECTOR_SIZE_SD  = 128;
 
