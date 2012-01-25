@@ -22,7 +22,7 @@
 */
 #include "drive_access.h"
 
-DriveAccess::DriveAccess(DriveStatus*(*a)(int), SectorPacket*(*b)(int,unsigned long), boolean(*c)(int,unsigned long,byte*,unsigned long), boolean(*d)(int,int)) {
+DriveAccess::DriveAccess(DriveStatus*(*a)(int), SectorDataInfo*(*b)(int,unsigned long,byte*), boolean(*c)(int,unsigned long,byte*,unsigned long), boolean(*d)(int,int)) {
   deviceStatusFunc = a;
   readSectorFunc = b;
   writeSectorFunc = c;

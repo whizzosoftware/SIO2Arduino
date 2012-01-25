@@ -13,7 +13,7 @@ public:
   DriveStatus* getStatus();
   boolean setImageFile(SdFile* file);
   unsigned long getImageSectorSize();
-  SectorPacket* getSectorData(unsigned long sector);
+  SectorDataInfo* getSectorData(unsigned long sector, byte *data);
   unsigned long writeSectorData(unsigned long sector, byte* data, unsigned long len);
   boolean formatImage(SdFile* file, int density);
   boolean hasImage();

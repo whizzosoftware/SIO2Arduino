@@ -48,14 +48,14 @@ boolean DiskDrive::setImageFile(SdFile *file) {
   return result;
 }
 
-SectorPacket* DiskDrive::getSectorData(unsigned long sector) {
+SectorDataInfo* DiskDrive::getSectorData(unsigned long sector, byte *data) {
   if (m_diskImage.hasImage()) {
     unsigned long startTime = micros();
     
-    SectorPacket *packet = m_diskImage.getSectorData(sector);
+    SectorDataInfo *info = m_diskImage.getSectorData(sector, data);
     // store the status frame if valid
-    if (packet->validStatusFrame) {
-      memcpy(&m_driveStatus.statusFrame, &(packet->statusFrame), sizeof(m_driveStatus.statusFrame));
+    if (info->validStatusFrame) {
+      memcpy(&m_driveStatus.statusFrame, &(info->statusFrame), sizeof(m_driveStatus.statusFrame));
     }
     
     // for images with copy-protection, make read time consistent across all sector reads to 
@@ -67,7 +67,7 @@ SectorPacket* DiskDrive::getSectorData(unsigned long sector) {
       delayMicroseconds(delta % 1000); // handle an argument larger than 16,383
     }
     
-    return packet;
+    return info;
   } else {
     return NULL;
   }

@@ -127,9 +127,9 @@ DriveStatus* getDeviceStatus(int deviceId) {
   return drive1.getStatus();
 }
 
-SectorPacket* readSector(int deviceId, unsigned long sector) {
+SectorDataInfo* readSector(int deviceId, unsigned long sector, byte *data) {
   if (drive1.hasImage()) {
-    return drive1.getSectorData(sector);
+    return drive1.getSectorData(sector, data);
   } else {
     return NULL;
   }

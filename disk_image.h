@@ -99,7 +99,7 @@ public:
   boolean setFile(SdFile* file);
   byte getType();
   unsigned long getSectorSize();
-  SectorPacket* getSectorData(unsigned long sector);
+  SectorDataInfo* getSectorData(unsigned long sector, byte* data);
   unsigned long writeSectorData(unsigned long, byte* data, unsigned long size);
   boolean format(SdFile *file, int density);
   boolean isEnhancedDensity();
@@ -116,7 +116,7 @@ private:
   unsigned long    m_headerSize;
   unsigned long    m_sectorSize;
   byte             m_sectorReadDelay;
-  SectorPacket     m_sectorBuffer;
+  SectorDataInfo   m_sectorInfo;
   boolean          m_usePhantoms;
   boolean          m_phantomFlip;
 #ifdef PRO_IMAGES

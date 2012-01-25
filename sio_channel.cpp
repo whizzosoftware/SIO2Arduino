@@ -236,7 +236,7 @@ void SIOChannel::cmdGetSector(int deviceId) {
   m_stream->write(ACK);
 
   // write data frame + checksum
-  SectorPacket *p = m_driveAccess->readSectorFunc(deviceId, getCommandSector());
+  SectorDataInfo *p = m_driveAccess->readSectorFunc(deviceId, getCommandSector(), (byte*)&m_sectorBuffer);
   if (p != NULL && !p->error) {
     // send complete 
     delay(DELAY_T5);
@@ -252,14 +252,14 @@ void SIOChannel::cmdGetSector(int deviceId) {
   delayMicroseconds(700);
 
   if (p != NULL) {
-    byte *b = p->data;
+    byte *b = (byte*)&m_sectorBuffer;
     // write data
     for (int i=0; i < p->length; i++) {
       m_stream->write(*b);
       b++;
     }
     // write checksum
-    m_stream->write(checksum(p->data, p->length));
+    m_stream->write(checksum((byte*)&m_sectorBuffer, p->length));
   } else {
     // write empty data + checksum
     for (int i=0; i < SD_SECTOR_SIZE + 1; i++) {
@@ -277,24 +277,24 @@ void SIOChannel::cmdPutSector(int deviceId) {
 
   DriveStatus *status = m_driveAccess->deviceStatusFunc(deviceId);
   m_putBytesRemaining = status->sectorSize + 1;
-  m_putSectorBufferPtr = m_putSectorBuffer;
+  m_putSectorBufferPtr = m_sectorBuffer;
 }
   
 void SIOChannel::doPutSector() {
-  int sectorSize = m_putSectorBufferPtr - m_putSectorBuffer - 1;
+  int sectorSize = m_putSectorBufferPtr - m_sectorBuffer - 1;
 
   // calculate checksum
-  byte chksum = checksum(m_putSectorBuffer, sectorSize);
+  byte chksum = checksum(m_sectorBuffer, sectorSize);
 
   // if checksum is good...
-  if (m_putSectorBuffer[sectorSize] == chksum) {
+  if (m_sectorBuffer[sectorSize] == chksum) {
     // send ACK
     delay(DELAY_T4);
     m_stream->write(ACK);
 
     // write sector to disk image
     delay(DELAY_T5);
-    if (m_driveAccess->writeSectorFunc(1, getCommandSector(), m_putSectorBuffer, sectorSize)) {
+    if (m_driveAccess->writeSectorFunc(1, getCommandSector(), m_sectorBuffer, sectorSize)) {
       // send COMPLETE
       m_stream->write(COMPLETE);
     } else {
@@ -309,7 +309,7 @@ void SIOChannel::doPutSector() {
     LOG_MSG("Data frame checksum error: ");
     LOG_MSG(chksum, HEX);
     LOG_MSG(" vs. ");
-    LOG_MSG_CR(m_putSectorBuffer[sectorSize], HEX);
+    LOG_MSG_CR(m_sectorBuffer[sectorSize], HEX);
   }
 
   // change state

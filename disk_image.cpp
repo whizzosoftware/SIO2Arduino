@@ -73,10 +73,10 @@ unsigned long DiskImage::getSectorSize() {
 /**
  * Read data from drive image.
  */
-SectorPacket* DiskImage::getSectorData(unsigned long sector) {
-  m_sectorBuffer.length = m_sectorSize;
-  m_sectorBuffer.error = false;
-  m_sectorBuffer.validStatusFrame = false;
+SectorDataInfo* DiskImage::getSectorData(unsigned long sector, byte *data) {
+  m_sectorInfo.length = m_sectorSize;
+  m_sectorInfo.error = false;
+  m_sectorInfo.validStatusFrame = false;
 
   // delay if necessary
   if (m_sectorReadDelay) {
@@ -90,9 +90,9 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
       if (sector < 4) {
         unsigned long ix = (sector - 1) * m_sectorSize;
         for (int i=0; i < m_sectorSize; i++) {
-          m_sectorBuffer.data[i] = KBOOT_LOADER[ix+i];
+          data[i] = KBOOT_LOADER[ix+i];
         }
-        return &m_sectorBuffer;
+        return &m_sectorInfo;
       } else {
         m_fileRef->seekSet((sector - 4) * m_sectorSize);
       }
@@ -110,12 +110,12 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
       }
   
       // return the status frame so the drive can return it on a subsequent status command
-      memcpy(&m_sectorBuffer.statusFrame, &m_proSectorHeader, sizeof(m_sectorBuffer.statusFrame));
-      m_sectorBuffer.validStatusFrame = true;
+      memcpy(&m_sectorInfo.statusFrame, &m_proSectorHeader, sizeof(m_sectorInfo.statusFrame));
+      m_sectorInfo.validStatusFrame = true;
       
       // if the header shows there was an error in this sector, return an error
       if (!m_proSectorHeader.statusFrame.hardwareStatus.crcError || !m_proSectorHeader.statusFrame.hardwareStatus.dataLostOrTrack0 || !m_proSectorHeader.statusFrame.hardwareStatus.recordNotFound) {
-        m_sectorBuffer.error = true;
+        m_sectorInfo.error = true;
       } else {
         // if there are phantom sector(s) associated with this sector, decide what to return
         if (m_usePhantoms && m_proSectorHeader.totalPhantoms > 0 && m_phantomFlip) {
@@ -137,24 +137,24 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
           }
         }
       }
-      m_sectorBuffer.validStatusFrame = true;
+      m_sectorInfo.validStatusFrame = true;
       if (ix > -1) {
         m_fileRef->seekSet(m_sectorHeaders[ix].fileIndex);
         if (m_sectorHeaders[ix].sstatus > 0) {
-          m_sectorBuffer.error = true;
+          m_sectorInfo.error = true;
         }
         // hardware status bits for floppy controller are active low, so bit flip
-        *((byte*)&m_sectorBuffer.statusFrame.hardwareStatus) = ~(m_sectorHeaders[ix].sstatus);
-        *((byte*)&m_sectorBuffer.statusFrame.commandStatus) = 0x10;
-        *(&m_sectorBuffer.statusFrame.timeout_lsb) = 0xE0;
+        *((byte*)&m_sectorInfo.statusFrame.hardwareStatus) = ~(m_sectorHeaders[ix].sstatus);
+        *((byte*)&m_sectorInfo.statusFrame.commandStatus) = 0x10;
+        *(&m_sectorInfo.statusFrame.timeout_lsb) = 0xE0;
       } else {
         // TODO: right now we just send back a random data frame -- is this correct?
         m_fileRef->seekSet(0);
-        m_sectorBuffer.error = true;
+        m_sectorInfo.error = true;
         // set the missing sector data bit (active low)
-        *((byte*)&m_sectorBuffer.statusFrame.hardwareStatus) = 0xF7;
-        *((byte*)&m_sectorBuffer.statusFrame.commandStatus) = 0x10;
-        *(&m_sectorBuffer.statusFrame.timeout_lsb) = 0xE0;
+        *((byte*)&m_sectorInfo.statusFrame.hardwareStatus) = 0xF7;
+        *((byte*)&m_sectorInfo.statusFrame.commandStatus) = 0x10;
+        *(&m_sectorInfo.statusFrame.timeout_lsb) = 0xE0;
       }
       // for now, do the same global flip of duplicate sector data as PRO
       // (alternate between first/last duplicate sectors on successive reads)
@@ -173,13 +173,13 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
   for (int i=0; i < m_sectorSize; i++) {
     b = m_fileRef->read();
     if (b != -1) {
-      m_sectorBuffer.data[i] = (byte)b;
+      data[i] = (byte)b;
     } else {
-      m_sectorBuffer.data[i] = 0;
+      data[i] = 0;
     }
   }
 
-  return &m_sectorBuffer;
+  return &m_sectorInfo;
 }
 
 /**

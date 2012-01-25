@@ -60,13 +60,11 @@ struct DriveStatus {
   StatusFrame   statusFrame;
 };
 
-struct SectorPacket {
+struct SectorDataInfo {
   unsigned long length;
   StatusFrame statusFrame;
   boolean validStatusFrame;
   boolean error;
-  byte data[MAX_SECTOR_SIZE];
-  
 };
 
 #endif
