@@ -168,8 +168,14 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
   }
 
   // read sector data into buffer
+  int b;
   for (int i=0; i < m_sectorSize; i++) {
-    m_sectorBuffer.data[i] = (byte)m_fileRef->read();
+    b = m_fileRef->read();
+    if (b != -1) {
+      m_sectorBuffer.data[i] = (byte)b;
+    } else {
+      m_sectorBuffer.data[i] = 0;
+    }
   }
 
   return &m_sectorBuffer;
