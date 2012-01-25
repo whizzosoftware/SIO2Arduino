@@ -53,7 +53,7 @@
 
 // uncomment this to enable debug logging -- make sure the HARDWARE_UART isn't the same as
 // the LOGGING_UART defined at the bottom of the file
-#define DEBUG 
+//#define DEBUG 
 
 /*
  * These are the Arduino pin definitions.
