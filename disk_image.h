@@ -9,9 +9,15 @@
 
 const byte TYPE_ATR = 1;
 const byte TYPE_XFD = 2;
+#ifdef PRO_IMAGES
 const byte TYPE_PRO = 3;
+#endif
+#ifdef ATX_IMAGES
 const byte TYPE_ATX = 4;
+#endif
+#ifdef XEX_IMAGES
 const byte TYPE_XEX = 5;
+#endif
 
 const unsigned long SECTOR_SIZE_SD  = 128;
 
@@ -42,6 +48,7 @@ struct ATRHeader {
   byte flags;
 };
 
+#ifdef PRO_IMAGES
 // PRO format
 const byte PSM_SIMPLE            = 0;
 const byte PSM_MINDSCAPE_SPECIAL = 1;
@@ -84,6 +91,7 @@ struct PROSectorHeader {
   byte n;
   byte phantom5;
 };
+#endif
 
 class DiskImage {
 public:
@@ -109,10 +117,11 @@ private:
   unsigned long    m_sectorSize;
   byte             m_sectorReadDelay;
   SectorPacket     m_sectorBuffer;
-  // PRO specific fields
-  PROSectorHeader  m_proSectorHeader;
   boolean          m_usePhantoms;
   boolean          m_phantomFlip;
+#ifdef PRO_IMAGES
+  PROSectorHeader  m_proSectorHeader;
+#endif  
 #ifdef ATX_IMAGES
   ATXSectorHeader  m_sectorHeaders[720];
 #endif

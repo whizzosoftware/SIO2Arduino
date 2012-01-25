@@ -42,6 +42,9 @@
 // uncomment if using an Ethernet shield for SD capabilities
 //#define ETHERNET_SHIELD
 
+// uncomment for PRO image format support
+//#define PRO_IMAGES
+
 // uncomment for ATX image format support (Mega 2560 only)
 //#define ATX_IMAGES
 

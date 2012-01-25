@@ -83,79 +83,88 @@ SectorPacket* DiskImage::getSectorData(unsigned long sector) {
   }
 
   // seek to proper offset in file
-  if (m_type == TYPE_PRO) {
-    // if this is a PRO image, we seek based on the sector number + the sector header size (omitting the header)
-    m_fileRef->seekSet(m_headerSize + ((sector - 1) * (m_sectorSize + sizeof(PROSectorHeader))));
-
-    // then we read the sector header
-    for (int i=0; i < sizeof(PROSectorHeader); i++) {
-      ((byte*)&m_proSectorHeader)[i] = (byte)m_fileRef->read();
-    }
-
-    // return the status frame so the drive can return it on a subsequent status command
-    memcpy(&m_sectorBuffer.statusFrame, &m_proSectorHeader, sizeof(m_sectorBuffer.statusFrame));
-    m_sectorBuffer.validStatusFrame = true;
-    
-    // if the header shows there was an error in this sector, return an error
-    if (!m_proSectorHeader.statusFrame.hardwareStatus.crcError || !m_proSectorHeader.statusFrame.hardwareStatus.dataLostOrTrack0 || !m_proSectorHeader.statusFrame.hardwareStatus.recordNotFound) {
-      m_sectorBuffer.error = true;
-    } else {
-      // if there are phantom sector(s) associated with this sector, decide what to return
-      if (m_usePhantoms && m_proSectorHeader.totalPhantoms > 0 && m_phantomFlip) {
-        m_fileRef->seekSet(m_headerSize + (((720 + m_proSectorHeader.phantom1) - 1) * (m_sectorSize + sizeof(PROSectorHeader))) + sizeof(PROSectorHeader));
-      }
-    }
-    m_phantomFlip = !m_phantomFlip; // TODO: do bad sectors cause this to flip?
+  switch (m_type) {
 #ifdef XEX_IMAGES
-  } else if (m_type == TYPE_XEX) {
-    if (sector < 4) {
-      unsigned long ix = (sector - 1) * m_sectorSize;
-      for (int i=0; i < m_sectorSize; i++) {
-        m_sectorBuffer.data[i] = KBOOT_LOADER[ix+i];
+    case TYPE_XEX: {
+      if (sector < 4) {
+        unsigned long ix = (sector - 1) * m_sectorSize;
+        for (int i=0; i < m_sectorSize; i++) {
+          m_sectorBuffer.data[i] = KBOOT_LOADER[ix+i];
+        }
+        return &m_sectorBuffer;
+      } else {
+        m_fileRef->seekSet((sector - 4) * m_sectorSize);
       }
-      return &m_sectorBuffer;
-    } else {
-      m_fileRef->seekSet((sector - 4) * m_sectorSize);
     }
+    break;
 #endif
-#ifdef ATX_IMAGES
-  } else if (m_type == TYPE_ATX) {
-    int ix = -1;
-    for (int i=0; i < 720; i++) {
-      if (m_sectorHeaders[i].sectorNumber == (sector-1)) {
-        ix = i;
-        if (!m_phantomFlip) {
-          break;
+#ifdef PRO_IMAGES
+    case TYPE_PRO: {
+      // if this is a PRO image, we seek based on the sector number + the sector header size (omitting the header)
+      m_fileRef->seekSet(m_headerSize + ((sector - 1) * (m_sectorSize + sizeof(PROSectorHeader))));
+  
+      // then we read the sector header
+      for (int i=0; i < sizeof(PROSectorHeader); i++) {
+        ((byte*)&m_proSectorHeader)[i] = (byte)m_fileRef->read();
+      }
+  
+      // return the status frame so the drive can return it on a subsequent status command
+      memcpy(&m_sectorBuffer.statusFrame, &m_proSectorHeader, sizeof(m_sectorBuffer.statusFrame));
+      m_sectorBuffer.validStatusFrame = true;
+      
+      // if the header shows there was an error in this sector, return an error
+      if (!m_proSectorHeader.statusFrame.hardwareStatus.crcError || !m_proSectorHeader.statusFrame.hardwareStatus.dataLostOrTrack0 || !m_proSectorHeader.statusFrame.hardwareStatus.recordNotFound) {
+        m_sectorBuffer.error = true;
+      } else {
+        // if there are phantom sector(s) associated with this sector, decide what to return
+        if (m_usePhantoms && m_proSectorHeader.totalPhantoms > 0 && m_phantomFlip) {
+          m_fileRef->seekSet(m_headerSize + (((720 + m_proSectorHeader.phantom1) - 1) * (m_sectorSize + sizeof(PROSectorHeader))) + sizeof(PROSectorHeader));
         }
       }
+      m_phantomFlip = !m_phantomFlip; // TODO: do bad sectors cause this to flip?
     }
-    m_sectorBuffer.validStatusFrame = true;
-    if (ix > -1) {
-      m_fileRef->seekSet(m_sectorHeaders[ix].fileIndex);
-      if (m_sectorHeaders[ix].sstatus > 0) {
-        m_sectorBuffer.error = true;
-      }
-      // hardware status bits for floppy controller are active low, so bit flip
-      *((byte*)&m_sectorBuffer.statusFrame.hardwareStatus) = ~(m_sectorHeaders[ix].sstatus);
-      *((byte*)&m_sectorBuffer.statusFrame.commandStatus) = 0x10;
-      *(&m_sectorBuffer.statusFrame.timeout_lsb) = 0xE0;
-    } else {
-      // TODO: right now we just send back a random data frame -- is this correct?
-      m_fileRef->seekSet(0);
-      m_sectorBuffer.error = true;
-      // set the missing sector data bit (active low)
-      *((byte*)&m_sectorBuffer.statusFrame.hardwareStatus) = 0xF7;
-      *((byte*)&m_sectorBuffer.statusFrame.commandStatus) = 0x10;
-      *(&m_sectorBuffer.statusFrame.timeout_lsb) = 0xE0;
-    }
-    // for now, do the same global flip of duplicate sector data as PRO
-    // (alternate between duplicate sectors on successive reads)
-    // TODO: this should be based on timing of sector angular position
-    m_phantomFlip = !m_phantomFlip;
+    break;
 #endif
-  } else {
-    // if this is an ATR or XFD image, we seek based on the sector number (omitting the header)
-    m_fileRef->seekSet(m_headerSize + ((sector - 1) * m_sectorSize));
+#ifdef ATX_IMAGES
+    case TYPE_ATX: {
+      int ix = -1;
+      for (int i=0; i < 720; i++) {
+        if (m_sectorHeaders[i].sectorNumber == (sector-1)) {
+          ix = i;
+          if (!m_phantomFlip) {
+            break;
+          }
+        }
+      }
+      m_sectorBuffer.validStatusFrame = true;
+      if (ix > -1) {
+        m_fileRef->seekSet(m_sectorHeaders[ix].fileIndex);
+        if (m_sectorHeaders[ix].sstatus > 0) {
+          m_sectorBuffer.error = true;
+        }
+        // hardware status bits for floppy controller are active low, so bit flip
+        *((byte*)&m_sectorBuffer.statusFrame.hardwareStatus) = ~(m_sectorHeaders[ix].sstatus);
+        *((byte*)&m_sectorBuffer.statusFrame.commandStatus) = 0x10;
+        *(&m_sectorBuffer.statusFrame.timeout_lsb) = 0xE0;
+      } else {
+        // TODO: right now we just send back a random data frame -- is this correct?
+        m_fileRef->seekSet(0);
+        m_sectorBuffer.error = true;
+        // set the missing sector data bit (active low)
+        *((byte*)&m_sectorBuffer.statusFrame.hardwareStatus) = 0xF7;
+        *((byte*)&m_sectorBuffer.statusFrame.commandStatus) = 0x10;
+        *(&m_sectorBuffer.statusFrame.timeout_lsb) = 0xE0;
+      }
+      // for now, do the same global flip of duplicate sector data as PRO
+      // (alternate between first/last duplicate sectors on successive reads)
+      // TODO: this should be based on timing of sector angular position
+      m_phantomFlip = !m_phantomFlip;
+    }
+    break;
+#endif
+    default:
+      m_fileRef->seekSet(m_headerSize + ((sector - 1) * m_sectorSize));
+      break;
   }
 
   // read sector data into buffer
@@ -246,6 +255,7 @@ boolean DiskImage::loadFile(SdFile *file) {
     return true;
   }
 
+#ifdef PRO_IMAGES
   // check if it's an APE PRO image
   PROFileHeader* proHeader = (PROFileHeader*)&header;
   if (proHeader->sectorCountHi * 256 + proHeader->sectorCountLo == ((m_fileSize-16)/(SECTOR_SIZE_SD+sizeof(PROSectorHeader))) && proHeader->magic == 'P') {
@@ -278,6 +288,7 @@ boolean DiskImage::loadFile(SdFile *file) {
 
     return true;
   }
+#endif
 
 #ifdef ATX_IMAGES
   // check if it's an ATX
@@ -413,7 +424,14 @@ boolean DiskImage::hasImage() {
 }
 
 boolean DiskImage::hasCopyProtection() {
-  return (m_type == TYPE_PRO || m_type == TYPE_ATX);
+  return (0 ||
+#ifdef PRO_IMAGES
+    m_type == TYPE_PRO ||
+#endif
+#ifdef ATX_IMAGES
+    m_type == TYPE_ATX ||
+#endif
+  0);
 }
 
 boolean DiskImage::isEnhancedDensity() {

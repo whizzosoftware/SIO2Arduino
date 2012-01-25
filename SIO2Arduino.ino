@@ -195,13 +195,15 @@ boolean isValidFilename(char *s) {
   return (  s[0] != '.' &&    // ignore hidden directories 
             s[0] != '_' && (  // ignore bogus files created by OS X
              (s[8] == 'A' && s[9] == 'T' && s[10] == 'R')
-          || (s[8] == 'P' && s[9] == 'R' && s[10] == 'O')
           || (s[8] == 'X' && s[9] == 'F' && s[10] == 'D')
-#ifdef XEX_IMAGES
-          || (s[8] == 'X' && s[9] == 'E' && s[10] == 'X')
-#endif              
+#ifdef PRO_IMAGES             
+          || (s[8] == 'P' && s[9] == 'R' && s[10] == 'O')
+#endif          
 #ifdef ATX_IMAGES              
           || (s[8] == 'A' && s[9] == 'T' && s[10] == 'X')
+#endif              
+#ifdef XEX_IMAGES
+          || (s[8] == 'X' && s[9] == 'E' && s[10] == 'X')
 #endif              
           )
         );
