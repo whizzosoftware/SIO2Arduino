@@ -34,17 +34,20 @@
  * Global variables
  */
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
-DriveControl driveControl(getFileList, mountFileIndex);
+DriveControl driveControl(getFileList, mountFileIndex, changeDirectory);
 SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess, &driveControl);
 Sd2Card card;
 SdVolume volume;
-SdFile root;
+SdFile currDir;
 SdFile file; // TODO: make this unnecessary
 DiskDrive drive1;
 #ifdef SELECTOR_BUTTON
 boolean isSwitchPressed = false;
 unsigned long lastSelectionPress;
 boolean isFileOpened;
+#endif
+#ifdef RESET_BUTTON
+unsigned long lastResetPress;
 #endif
 #ifdef LCD_DISPLAY
 LiquidCrystal lcd(PIN_LCD_RD,PIN_LCD_ENABLE,PIN_LCD_DB4,PIN_LCD_DB5,PIN_LCD_DB6,PIN_LCD_DB7);
@@ -62,6 +65,9 @@ void setup() {
   // set pin modes
   #ifdef SELECTOR_BUTTON
   pinMode(PIN_SELECTOR, INPUT);
+  #endif
+  #ifdef RESET_BUTTON
+  pinMode(PIN_RESET, INPUT);
   #endif
 
   #ifdef LCD_DISPLAY
@@ -91,7 +97,7 @@ void setup() {
     return;
   }
 
-  if (!root.openRoot(&volume)) {
+  if (!currDir.openRoot(&volume)) {
     LOG_MSG_CR(" failed.");
     #ifdef LCD_DISPLAY
       lcd.print("SD Root Error");
@@ -113,7 +119,15 @@ void loop() {
   // watch the selector button (accounting for debounce)
   if (digitalRead(PIN_SELECTOR) == HIGH && millis() - lastSelectionPress > 250) {
     lastSelectionPress = millis();
-    changeDisk();
+    changeDisk(0);
+  }
+  #endif
+  
+  #ifdef RESET_BUTTON
+  // watch the reset button
+  if (digitalRead(PIN_RESET) == HIGH && millis() - lastResetPress > 250) {
+    lastResetPress = millis();
+    mountFilename(0, "AUTORUN.ATR");
   }
   #endif
 }
@@ -153,7 +167,7 @@ boolean format(int deviceId, int density) {
   LOG_MSG_CR(name);
 
   // open new file for writing
-  file.open(&root, name, O_RDWR | O_SYNC | O_CREAT);
+  file.open(&currDir, name, O_RDWR | O_SYNC | O_CREAT);
 
   LOG_MSG("Created new file: ");
   LOG_MSG_CR(name);
@@ -168,31 +182,31 @@ boolean format(int deviceId, int density) {
   }  
 }
 
-void changeDisk() {
+void changeDisk(int deviceId) {
   dir_t dir;
   char name[13];
   boolean imageChanged = false;
 
   while (!imageChanged) {
     // get next dir entry
-    int8_t result = root.readDir((dir_t*)&dir);
+    int8_t result = currDir.readDir((dir_t*)&dir);
     
     // if we got back a 0, rewind the directory and get the first dir entry
     if (!result) {
-      root.rewind();
-      result = root.readDir((dir_t*)&dir);
+      currDir.rewind();
+      result = currDir.readDir((dir_t*)&dir);
     }
     
     // if we have a valid file response code, open it
     if (result > 0 && isValidFilename((char*)&dir.name)) {
       createFilename(name, (char*)dir.name);
-      imageChanged = mountFilename(name);
+      imageChanged = mountFilename(deviceId, name);
     }
   }
 }
 
 boolean isValidFilename(char *s) {
-  return (  s[0] != '.' &&    // ignore hidden directories 
+  return (  s[0] != '.' &&    // ignore hidden files 
             s[0] != '_' && (  // ignore bogus files created by OS X
              (s[8] == 'A' && s[9] == 'T' && s[10] == 'R')
           || (s[8] == 'X' && s[9] == 'F' && s[10] == 'D')
@@ -215,50 +229,106 @@ void createFilename(char* filename, char* name) {
       *(filename++) = name[i];
     }
   }
-  *(filename++) = '.';
-  *(filename++) = name[8];
-  *(filename++) = name[9];
-  *(filename++) = name[10];
+  if (name[8] != ' ') {
+    *(filename++) = '.';
+    *(filename++) = name[8];
+    *(filename++) = name[9];
+    *(filename++) = name[10];
+  }
   *(filename++) = '\0';
 }
 
-void getFileList(int page, int count, FileEntry *entries) {
+/**
+ * Returns a list of files in the current directory.
+ *
+ * startIndex = the first valid file in the directory to start from
+ * count = how many files to return
+ * entries = a pointer to the a FileEntry array to hold the returned data
+ */
+int getFileList(int startIndex, int count, FileEntry *entries) {
   dir_t dir;
-  
-  root.rewind();
+  int currentEntry = 0;
+
+  currDir.rewind();
 
   int ix = 0;
   while (ix < count) {
-    if (root.readDir((dir_t*)&dir) < 1) {
+    if (currDir.readDir((dir_t*)&dir) < 1) {
       break;
     }
-    if (isValidFilename((char*)&dir.name)) {
-      memcpy(entries[ix++].name, dir.name, 11);
+    if (isValidFilename((char*)&dir.name) || (DIR_IS_SUBDIR(&dir) && dir.name[0] != '.')) {
+      if (currentEntry >= startIndex) {
+        memcpy(entries[ix].name, dir.name, 11);
+        if (DIR_IS_SUBDIR(&dir)) {
+          entries[ix].isDirectory = true;
+        } else {
+          entries[ix].isDirectory = false;
+        }
+        ix++;
+      }
+      currentEntry++;
+    }
+  }
+  
+  return ix;
+}
+
+/**
+ * Changes the SD card directory.
+ *
+ * ix = index number (or -1 to go to parent directory)
+ */
+void changeDirectory(int ix) {
+  FileEntry entries[1];
+  char name[13];
+  SdFile subDir;
+
+  if (ix > -1) {  
+    getFileList(ix, 1, entries);
+    createFilename(name, entries[0].name);
+    if (subDir.open(&currDir, name, O_READ)) {
+      currDir = subDir;
+    }
+  } else {
+    if (subDir.openRoot(&volume)) {
+      currDir = subDir;
     }
   }
 }
 
-void mountFileIndex(int deviceId, int ix, int count) {
-  FileEntry entries[count];
+/**
+ * Mount a file with the given index number.
+ *
+ * deviceId = the drive ID
+ * ix = the index of the file to mount
+ */
+void mountFileIndex(int deviceId, int ix) {
+  FileEntry entries[1];
   char name[13];
 
   // figure out what filename is associated with the index
-  getFileList(ix, count, entries);
+  getFileList(ix, 1, entries);
 
   // build a full 8.3 filename
-  createFilename(name, entries[ix].name);
+  createFilename(name, entries[0].name);
 
   // mount the image
-  mountFilename(name);
+  mountFilename(deviceId, name);
 }
 
-boolean mountFilename(char *name) {
+/**
+ * Mount a file with the given name.
+ *
+ * deviceId = the drive ID
+ * name = the name of the file to mount
+ */
+boolean mountFilename(int deviceId, char *name) {
   // close previously open file
   if (file.isOpen()) {
     file.close();
   }
   
-  if (file.open(&root, name, O_RDWR | O_SYNC) && drive1.setImageFile(&file)) {
+  if (file.open(&currDir, name, O_RDWR | O_SYNC) && drive1.setImageFile(&file)) {
     LOG_MSG_CR(name);
 
     #ifdef LCD_DISPLAY

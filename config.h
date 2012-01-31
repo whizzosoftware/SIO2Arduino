@@ -39,6 +39,9 @@
 // Uncomment this line if you are using a hardware button for image selection
 #define SELECTOR_BUTTON
 
+// Uncomment this line if you want a reset button (automatically mounts /AUTORUN.ATR)
+//#define RESET_BUTTON
+
 // uncomment if using an Ethernet shield for SD capabilities
 //#define ETHERNET_SHIELD
 
@@ -80,6 +83,10 @@
 
 #ifdef SELECTOR_BUTTON
   #define PIN_SELECTOR        3    // the selector button pin
+#endif
+
+#ifdef RESET_BUTTON
+  #define PIN_RESET           3    // the reset button pin
 #endif
 
 #ifdef LCD_DISPLAY

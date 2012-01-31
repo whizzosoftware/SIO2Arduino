@@ -38,7 +38,9 @@ boolean SDriveHandler::isValidCommand(byte cmd) {
           cmd == CMD_SDRIVE_SWAP_VDN ||
           cmd == CMD_SDRIVE_GETPARAMS ||
           cmd == CMD_SDRIVE_GET_ENTRIES ||
+          cmd == CMD_SDRIVE_CHDIR_VDN ||
           cmd == CMD_SDRIVE_CHDIR ||
+          cmd == CMD_SDRIVE_CHDIR_UP ||
           cmd == CMD_SDRIVE_GET20 ||
           cmd == CMD_SDRIVE_MOUNT_D0 ||
           cmd == CMD_SDRIVE_MOUNT_D1 ||
@@ -71,11 +73,17 @@ void SDriveHandler::processCommand(CommandFrame* cmdFrame, Stream* stream) {
     case CMD_SDRIVE_GET_ENTRIES:
       cmdGetEntries(cmdFrame->aux1, stream);
       break;
+    case CMD_SDRIVE_CHDIR_VDN:
+      cmdChdirVDN(stream);
+      break;
+    case CMD_SDRIVE_CHDIR_UP:
+      cmdChdirUp((cmdFrame->aux1 > 0), stream);
+      break;
     case CMD_SDRIVE_CHDIR:
-      cmdChdir(stream);
+      cmdChdir(cmdFrame->aux2 * 256 + cmdFrame->aux1, stream);
       break;
     case CMD_SDRIVE_GET20:
-      cmdGet20(stream);
+      cmdGet20(cmdFrame->aux2 * 256 + cmdFrame->aux1, stream);
       break;
     case CMD_SDRIVE_MOUNT_D0:
       cmdMountDrive(0, cmdFrame->aux2 * 256 + cmdFrame->aux1, stream);
@@ -157,7 +165,7 @@ void SDriveHandler::cmdGetEntries(byte n, Stream *stream) {
   stream->flush();
 }
 
-void SDriveHandler::cmdChdir(Stream* stream) {
+void SDriveHandler::cmdChdirVDN(Stream* stream) {
   // NO-OP
   delay(DELAY_T2);
   stream->write(ACK);
@@ -170,27 +178,76 @@ void SDriveHandler::cmdChdir(Stream* stream) {
   stream->flush();
 }
 
-void SDriveHandler::cmdGet20(Stream *stream) {
+void SDriveHandler::cmdChdirUp(bool getDirName, Stream* stream) {
+  delay(DELAY_T2);
+  stream->write(ACK);
+  delay(DELAY_T5);
+
+  m_driveControl->changeDir(-1);
+
+  stream->write(COMPLETE);
+
+  if (getDirName) {
+    stream->write('F');
+    for (int i=0; i < 10; i++) {
+      stream->write(' ');
+    }
+    stream->write((byte)19);
+    stream->write((byte)0);
+    stream->write((byte)0);
+  }
+  
+  stream->flush();
+}
+
+void SDriveHandler::cmdChdir(int ix, Stream* stream) {
+  delay(DELAY_T2);
+  stream->write(ACK);
+  delay(DELAY_T5);
+
+  m_driveControl->changeDir(ix);
+
+  stream->write(COMPLETE);
+  stream->flush();
+}
+
+void SDriveHandler::cmdGet20(int page, Stream *stream) {
   delay(DELAY_T2);
   stream->write(ACK);
   delay(DELAY_T5);
   stream->write(COMPLETE);
   byte chkSum = 0;
-  FileEntry fileEntries[20];
 
-  m_driveControl->getFileList(0, 20, fileEntries);
+  FileEntry fileEntries[21];
+  for (int i=0; i < 21; i++) {
+    memset(fileEntries[i].name, 0, 11);
+    fileEntries[i].isDirectory = false;
+  }
 
+  int count = m_driveControl->getFileList(page, 21, fileEntries);
+
+  char c;
   for (int i1=0; i1 < 20; i1++) {
     FileEntry entry = fileEntries[i1];
     for (int i2=0; i2 < 11; i2++) {
-      char c = entry.name[i2];
+      c = entry.name[i2];
       stream->write(c);
       chkSum = ((chkSum+c)>>8) + ((chkSum+c)&0xff);
     }
+    if (entry.isDirectory) {
+      stream->write((byte)19);
+      chkSum = ((chkSum+19)>>8) + ((chkSum+19)&0xff);
+    } else {
+      stream->write((byte)0x00);
+    }
+  }
+
+  if (count > 20) {
+    stream->write(fileEntries[20].name[0]);
+  } else {
     stream->write((byte)0x00);
   }
 
-  stream->write((byte)0x00);
   stream->write(chkSum);
   stream->flush();
 }
@@ -199,7 +256,7 @@ void SDriveHandler::cmdMountDrive(byte driveNum, byte index, Stream* stream) {
   delay(DELAY_T2);
   stream->write(ACK);
 
-  m_driveControl->mountFile(1, index, 20);
+  m_driveControl->mountFile(1, index);
 
   delay(DELAY_T5);
   stream->write(COMPLETE);
@@ -228,8 +285,14 @@ boolean SDriveHandler::printCmdName(byte cmd) {
     case CMD_SDRIVE_GET_ENTRIES:
       LOG_MSG("SDRIVE GET ENTRIES");
       break;
+    case CMD_SDRIVE_CHDIR_VDN:
+      LOG_MSG("SDRIVE CHDIR VDN");
+      break;
     case CMD_SDRIVE_CHDIR:
       LOG_MSG("SDRIVE CHDIR");
+      break;
+    case CMD_SDRIVE_CHDIR_UP:
+      LOG_MSG("SDRIVE CHDIR UP");
       break;
     case CMD_SDRIVE_GET20:
       LOG_MSG("SDRIVE GET20");

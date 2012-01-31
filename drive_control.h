@@ -3,14 +3,16 @@
 
 struct FileEntry {
   char name[11];
+  bool isDirectory;
 };
 
 class DriveControl {
 public:
-  DriveControl(void(*getFileList)(int,int,FileEntry*), void(*mountFile)(int,int,int));
+  DriveControl(int(*getFileList)(int,int,FileEntry*), void(*mountFile)(int,int), void(*changeDir)(int));
 
-  void(*getFileList)(int,int,FileEntry*);
-  void(*mountFile)(int,int,int);
+  int(*getFileList)(int,int,FileEntry*);
+  void(*mountFile)(int,int);
+  void(*changeDir)(int);
 };
 
 #endif
