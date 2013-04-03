@@ -30,17 +30,18 @@
 // These are the Arduino devices that can be used. I'm sure others would work,
 // but these are the only ones I have to test with. Only one of these should
 // be uncommented.
-#define ARDUINO_UNO              // Arduino Uno board
+//#define ARDUINO_UNO              // Arduino Uno board
 //#define ARDUINO_MEGA           // Arduino Mega 2560/ADK board
+#define ARDUINO_TEENSY          // PJRC Teensy 2.0
 
 // Uncomment this line if you are using an LCD display
 //#define LCD_DISPLAY
 
 // Uncomment this line if you are using a hardware button for image selection
-#define SELECTOR_BUTTON
+//#define SELECTOR_BUTTON
 
 // Uncomment this line if you want a reset button (automatically mounts /AUTORUN.ATR)
-//#define RESET_BUTTON
+#define RESET_BUTTON
 
 // uncomment if using an Ethernet shield for SD capabilities
 //#define ETHERNET_SHIELD
@@ -62,7 +63,12 @@
  * These are the Arduino pin definitions.
  */
  
+#if defined(ARDUINO_MEGA) || defined(ARDUINO_UNO)
 #define PIN_ATARI_CMD         2    // the Atari SIO command line - usually the purple wire on the SIO cable
+#endif
+#ifdef ARDUINO_TEENSY
+#define PIN_ATARI_CMD         4    // the Atari SIO command line - usually the purple wire on the SIO cable
+#endif
 
 // for now, you can't change these pin definitions
 #ifdef ETHERNET_SHIELD
@@ -73,11 +79,18 @@
     #define PIN_SD_DI         51   // the SD breakout board's DI pin
     #define PIN_SD_DO         50   // the SD breakout board's DO pin
     #define PIN_SD_CLK        52   // the SD breakout board's CLK pin
-  #else
+  #endif
+  #ifdef ARDUINO_UNO
     #define PIN_SD_CS         10   // the SD breakout board's CS (chip select) pin
     #define PIN_SD_DI         11   // the SD breakout board's DI pin
     #define PIN_SD_DO         12   // the SD breakout board's DO pin
     #define PIN_SD_CLK        13   // the SD breakout board's CLK pin
+  #endif
+  #ifdef ARDUINO_TEENSY
+    #define PIN_SD_CS         0   // the SD breakout board's CS (chip select) pin
+    #define PIN_SD_DI         1   // the SD breakout board's DI pin
+    #define PIN_SD_DO         2   // the SD breakout board's DO pin
+    #define PIN_SD_CLK        3   // the SD breakout board's CLK pin
   #endif
 #endif
 
@@ -86,7 +99,7 @@
 #endif
 
 #ifdef RESET_BUTTON
-  #define PIN_RESET           3    // the reset button pin
+  #define PIN_RESET           5    // the reset button pin
 #endif
 
 #ifdef LCD_DISPLAY
@@ -108,7 +121,7 @@
 #endif
 
 // the hardware UART to use for SIO bus communication
-#ifdef ARDUINO_MEGA
+#if defined(ARDUINO_MEGA) || defined(ARDUINO_TEENSY)
   #define SIO_UART     Serial1
   #define SIO_CALLBACK serialEvent1
 #else
