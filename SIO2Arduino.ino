@@ -130,6 +130,11 @@ void loop() {
     mountFilename(0, "AUTORUN.ATR");
   }
   #endif
+  
+  #ifdef ARDUINO_TEENSY
+    if (SIO_UART.available())
+      SIO_CALLBACK();
+  #endif
 }
 
 void SIO_CALLBACK() {
