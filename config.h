@@ -30,18 +30,18 @@
 // These are the Arduino devices that can be used. I'm sure others would work,
 // but these are the only ones I have to test with. Only one of these should
 // be uncommented.
-//#define ARDUINO_UNO              // Arduino Uno board
+#define ARDUINO_UNO              // Arduino Uno board
 //#define ARDUINO_MEGA           // Arduino Mega 2560/ADK board
-#define ARDUINO_TEENSY          // PJRC Teensy 2.0
+//#define ARDUINO_TEENSY          // PJRC Teensy 2.0
 
 // Uncomment this line if you are using an LCD display
 //#define LCD_DISPLAY
 
 // Uncomment this line if you are using a hardware button for image selection
-//#define SELECTOR_BUTTON
+#define SELECTOR_BUTTON
 
 // Uncomment this line if you want a reset button (automatically mounts /AUTORUN.ATR)
-#define RESET_BUTTON
+//#define RESET_BUTTON
 
 // uncomment if using an Ethernet shield for SD capabilities
 //#define ETHERNET_SHIELD
@@ -63,11 +63,10 @@
  * These are the Arduino pin definitions.
  */
  
-#if defined(ARDUINO_MEGA) || defined(ARDUINO_UNO)
-#define PIN_ATARI_CMD         2    // the Atari SIO command line - usually the purple wire on the SIO cable
-#endif
 #ifdef ARDUINO_TEENSY
-#define PIN_ATARI_CMD         4    // the Atari SIO command line - usually the purple wire on the SIO cable
+  #define PIN_ATARI_CMD         4    // the Atari SIO command line - usually the purple wire on the SIO cable
+#else
+  #define PIN_ATARI_CMD         2    // the Atari SIO command line - usually the purple wire on the SIO cable
 #endif
 
 // for now, you can't change these pin definitions
@@ -99,7 +98,11 @@
 #endif
 
 #ifdef RESET_BUTTON
-  #define PIN_RESET           5    // the reset button pin
+  #ifdef ARDUINO_TEENSY
+    #define PIN_RESET           5    // the reset button pin
+  #else
+    #define PIN_RESET           3    // the reset button pin
+  #endif
 #endif
 
 #ifdef LCD_DISPLAY
