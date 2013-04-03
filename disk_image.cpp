@@ -205,9 +205,6 @@ boolean DiskImage::format(SdFile *file, int density) {
   if (!m_readOnly) {
     // determine file length
     unsigned long length = FORMAT_SS_SD_40;
-    if (density == DENSITY_ED) {
-      length = FORMAT_SS_ED_40;
-    }
   
     // make sure we're at beginning of file
     file->seekSet(0);
@@ -442,11 +439,11 @@ boolean DiskImage::hasCopyProtection() {
 }
 
 boolean DiskImage::isEnhancedDensity() {
-  return (m_fileSize == FORMAT_SS_ED_35 + m_headerSize || m_fileSize == FORMAT_SS_ED_40 + m_headerSize);
+  return false;
 }
 
 boolean DiskImage::isDoubleDensity() {
-  return (m_fileSize == FORMAT_SS_DD_35 + m_headerSize || m_fileSize == FORMAT_SS_DD_40 + m_headerSize);
+  return false;
 }
 
 boolean DiskImage::isReadOnly() {

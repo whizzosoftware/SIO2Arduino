@@ -7,26 +7,20 @@
 #include "atari.h"
 #include "config.h"
 
-const byte TYPE_ATR = 1;
-const byte TYPE_XFD = 2;
+#define TYPE_ATR 1
+#define TYPE_XFD 2
 #ifdef PRO_IMAGES
-const byte TYPE_PRO = 3;
+#define TYPE_PRO 3
 #endif
 #ifdef ATX_IMAGES
-const byte TYPE_ATX = 4;
+#define TYPE_ATX 4
 #endif
 #ifdef XEX_IMAGES
-const byte TYPE_XEX = 5;
+#define TYPE_XEX 5
 #endif
 
-const unsigned long SECTOR_SIZE_SD  = 128;
-
-const unsigned long FORMAT_SS_SD_35 = 80640;
-const unsigned long FORMAT_SS_SD_40 = 92160;
-const unsigned long FORMAT_SS_ED_35 = 116480;
-const unsigned long FORMAT_SS_ED_40 = 133120;
-const unsigned long FORMAT_SS_DD_35 = 160896;
-const unsigned long FORMAT_SS_DD_40 = 183936;
+#define SECTOR_SIZE_SD  128
+#define FORMAT_SS_SD_40 92160
 
 #ifdef ATX_IMAGES
 struct ATXSectorHeader {
