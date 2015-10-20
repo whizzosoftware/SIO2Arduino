@@ -39,7 +39,7 @@
 //#define LCD_DISPLAY
 
 // Uncomment this line if you are using a hardware button for image selection
-//#define SELECTOR_BUTTON
+#define SELECTOR_BUTTON
 
 // Uncomment this line if you want a reset button (automatically mounts /AUTORUN.ATR) (deprecated, AUTORUN.ATR always mounted if it exists)
 //#define RESET_BUTTON
