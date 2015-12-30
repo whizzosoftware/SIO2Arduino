@@ -252,9 +252,9 @@ boolean DiskImage::loadFile(SdFile *file) {
     m_sectorSize = atrHeader->secSize;
     m_sectorReadDelay = 0;
     
-    LOG_MSG("Loaded ATR with sector size ");
+    LOG_MSG(F("Loaded ATR with sector size "));
     LOG_MSG(atrHeader->secSize);
-    LOG_MSG(": ");
+    LOG_MSG(F(": "));
     
     return true;
   }
@@ -288,7 +288,7 @@ boolean DiskImage::loadFile(SdFile *file) {
         break;
     }
 
-    LOG_MSG("Loaded PRO with sector size 128: ");
+    LOG_MSG(F("Loaded PRO with sector size 128: "));
 
     return true;
   }
@@ -383,12 +383,12 @@ boolean DiskImage::loadFile(SdFile *file) {
       file->seekSet(fileIndex);
     }
 
-    LOG_MSG("Loaded ATX with sector size 128: ");
+    LOG_MSG(F("Loaded ATX with sector size 128: "));
     return true;
   }  
 #endif
 
-  file->getFilename((char*)&filename);
+  file->getName((char*)&filename, 13);
   int len = strlen(filename);
   char *extension = filename + len - 4;
 
@@ -401,7 +401,7 @@ boolean DiskImage::loadFile(SdFile *file) {
     m_sectorSize = SECTOR_SIZE_SD;
     m_sectorReadDelay = 0;
 
-    LOG_MSG("Loaded XFD with sector size 128: ");
+    LOG_MSG(F("Loaded XFD with sector size 128: "));
     return true;
 #ifdef XEX_IMAGES    
   } else if ((!strcmp(".XEX", extension) || !strcmp(".xex", extension))) {
@@ -415,7 +415,7 @@ boolean DiskImage::loadFile(SdFile *file) {
     KBOOT_LOADER[9] = m_fileSize & 0xFF;
     KBOOT_LOADER[10] = m_fileSize >> 8;
     
-    LOG_MSG("Loaded XEX with sector size 128: ");
+    LOG_MSG(F("Loaded XEX with sector size 128: "));
     return true;
 #endif    
   }
