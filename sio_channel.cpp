@@ -127,9 +127,9 @@ void SIOChannel::processIncomingByte() {
       break;
     }
     default:
-      LOG_MSG("Ignoring byte ");
+      LOG_MSG(F("Ignoring byte "));
       LOG_MSG(b, HEX);
-      LOG_MSG(" in state ");
+      LOG_MSG(F(" in state "));
       LOG_MSG_CR(m_cmdPinState);
       break;
   }
@@ -138,9 +138,9 @@ void SIOChannel::processIncomingByte() {
 boolean SIOChannel::isChecksumValid() {
   byte chkSum = checksum((byte*)&m_cmdFrame, 4);
   if (chkSum != m_cmdFrame.checksum) {
-    LOG_MSG("Checksum failed. Calculated: ");
+    LOG_MSG(F("Checksum failed. Calculated: "));
     LOG_MSG(chkSum);
-    LOG_MSG("; received: ");
+    LOG_MSG(F("; received: "));
     LOG_MSG_CR(m_cmdFrame.checksum);
 
     return false;
@@ -298,7 +298,7 @@ void SIOChannel::doPutSector() {
       // send COMPLETE
       m_stream->write(COMPLETE);
     } else {
-      LOG_MSG_CR("Write to device error");
+      LOG_MSG_CR(F("Write to device error"));
       m_stream->write(ERR);
     }
   // otherwise, NAK it
@@ -306,9 +306,9 @@ void SIOChannel::doPutSector() {
     delay(DELAY_T4);
     m_stream->write(NAK);
 
-    LOG_MSG("Data frame checksum error: ");
+    LOG_MSG(F("Data frame checksum error: "));
     LOG_MSG(chksum, HEX);
-    LOG_MSG(" vs. ");
+    LOG_MSG(F(" vs. "));
     LOG_MSG_CR(m_sectorBuffer[sectorSize], HEX);
   }
 
@@ -352,7 +352,7 @@ void SIOChannel::cmdFormat(int deviceId, int density) {
     delay(DELAY_T5);
     m_stream->write(COMPLETE);
     
-    LOG_MSG("Sending data frame of length ");
+    LOG_MSG(F("Sending data frame of length "));
     LOG_MSG_CR(SD_SECTOR_SIZE);
 
     m_stream->write(0xFF);
@@ -372,44 +372,44 @@ void SIOChannel::dumpCommandFrame() {
 // we only compile this on DEBUG to save allocating string constants
 #ifdef DEBUG
   LOG_MSG(m_cmdFrame.deviceId, HEX);
-  LOG_MSG(" ");
+  LOG_MSG(F(" "));
   LOG_MSG(m_cmdFrame.command, HEX);
-  LOG_MSG(" ");
+  LOG_MSG(F(" "));
   LOG_MSG(m_cmdFrame.aux1, HEX);
-  LOG_MSG(" ");
+  LOG_MSG(F(" "));
   LOG_MSG(m_cmdFrame.aux2, HEX);
-  LOG_MSG(" ");
+  LOG_MSG(F(" "));
   LOG_MSG(m_cmdFrame.checksum, HEX);
-  LOG_MSG(" : ");
+  LOG_MSG(F(" : "));
   
   switch (m_cmdFrame.command) {
     case CMD_STATUS:
-      LOG_MSG("STATUS");
+      LOG_MSG(F("STATUS"));
       break;
     case CMD_POLL:
-      LOG_MSG("POLL");
+      LOG_MSG(F("POLL"));
       break;
     case CMD_READ:
-      LOG_MSG("READ ");
+      LOG_MSG(F("READ "));
       LOG_MSG(getCommandSector());
       break;
     case CMD_WRITE:
-      LOG_MSG("WRITE ");
+      LOG_MSG(F("WRITE "));
       LOG_MSG(getCommandSector());
       break;
     case CMD_PUT:
-      LOG_MSG("PUT ");
+      LOG_MSG(F("PUT "));
       LOG_MSG(getCommandSector());
       break;
     case CMD_FORMAT:
-      LOG_MSG("FORMAT");
+      LOG_MSG(F("FORMAT"));
       break;
     case CMD_FORMAT_MD:
-      LOG_MSG("FORMAT MD");
+      LOG_MSG(F("FORMAT MD"));
       break;
     default:
       if (!m_sdriveHandler.printCmdName(m_cmdFrame.command)) {
-        LOG_MSG("??");
+        LOG_MSG(F("??"));
       }
   }
   
@@ -426,4 +426,3 @@ void SIOChannel::resetCommandFrameBuffer() {
   memset(&m_cmdFrame, 0, sizeof(m_cmdFrame));
   m_cmdFramePtr = (byte*)&m_cmdFrame;
 }
-

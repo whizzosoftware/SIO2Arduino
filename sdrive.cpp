@@ -268,49 +268,49 @@ boolean SDriveHandler::printCmdName(byte cmd) {
 #ifdef DEBUG
   switch (cmd) {
     case CMD_SDRIVE_IDENT:
-      LOG_MSG("SDRIVE IDENT");
+      LOG_MSG(F("SDRIVE IDENT"));
       break;
     case CMD_SDRIVE_INIT:
-      LOG_MSG("SDRIVE INIT");
+      LOG_MSG(F("SDRIVE INIT"));
       break;
     case CMD_SDRIVE_CHROOT:
-      LOG_MSG("SDRIVE CHROOT");
+      LOG_MSG(F("SDRIVE CHROOT"));
       break;
     case CMD_SDRIVE_SWAP_VDN:
-      LOG_MSG("SDRIVE SWAP VDN");
+      LOG_MSG(F("SDRIVE SWAP VDN"));
       break;
     case CMD_SDRIVE_GETPARAMS:
-      LOG_MSG("SDRIVE GETPARAMS");
+      LOG_MSG(F("SDRIVE GETPARAMS"));
       break;
     case CMD_SDRIVE_GET_ENTRIES:
-      LOG_MSG("SDRIVE GET ENTRIES");
+      LOG_MSG(F("SDRIVE GET ENTRIES"));
       break;
     case CMD_SDRIVE_CHDIR_VDN:
-      LOG_MSG("SDRIVE CHDIR VDN");
+      LOG_MSG(F("SDRIVE CHDIR VDN"));
       break;
     case CMD_SDRIVE_CHDIR:
-      LOG_MSG("SDRIVE CHDIR");
+      LOG_MSG(F("SDRIVE CHDIR"));
       break;
     case CMD_SDRIVE_CHDIR_UP:
-      LOG_MSG("SDRIVE CHDIR UP");
+      LOG_MSG(F("SDRIVE CHDIR UP"));
       break;
     case CMD_SDRIVE_GET20:
-      LOG_MSG("SDRIVE GET20");
+      LOG_MSG(F("SDRIVE GET20"));
       break;
     case CMD_SDRIVE_MOUNT_D0:
-      LOG_MSG("SDRIVE MOUNTvD0");
+      LOG_MSG(F("SDRIVE MOUNTvD0"));
       break;
     case CMD_SDRIVE_MOUNT_D1:
-      LOG_MSG("SDRIVE MOUNTvD1");
+      LOG_MSG(F("SDRIVE MOUNTvD1"));
       break;
     case CMD_SDRIVE_MOUNT_D2:
-      LOG_MSG("SDRIVE MOUNTvD2");
+      LOG_MSG(F("SDRIVE MOUNTvD2"));
       break;
     case CMD_SDRIVE_MOUNT_D3:
-      LOG_MSG("SDRIVE MOUNTvD3");
+      LOG_MSG(F("SDRIVE MOUNTvD3"));
       break;
     case CMD_SDRIVE_MOUNT_D4:
-      LOG_MSG("SDRIVE MOUNTvD4");
+      LOG_MSG(F("SDRIVE MOUNTvD4"));
       break;
     default:
       return false;

@@ -23,6 +23,7 @@
 #include "config.h"
 #include <SdFat.h>
 #include <SdFatUtil.h>
+#include <SdVolume.h>
 #include "atari.h"
 #include "sio_channel.h"
 #include "disk_drive.h"
@@ -44,7 +45,7 @@ DiskDrive drive1;
 #ifdef SELECTOR_BUTTON
 boolean isSwitchPressed = false;
 unsigned long lastSelectionPress;
-boolean isFileOpened;
+boolean isFileOpened=false;
 #endif
 #ifdef RESET_BUTTON
 unsigned long lastResetPress;
@@ -64,51 +65,53 @@ void setup() {
 
   // set pin modes
   #ifdef SELECTOR_BUTTON
-  pinMode(PIN_SELECTOR, INPUT);
+  pinMode(PIN_SELECTOR, INPUT_PULLUP);
   #endif
   #ifdef RESET_BUTTON
-  pinMode(PIN_RESET, INPUT);
+  pinMode(PIN_RESET, INPUT_PULLUP);
   #endif
 
   #ifdef LCD_DISPLAY
   // set up LCD if appropriate
   lcd.begin(16, 2);
-  lcd.print("SIO2Arduino");
+  lcd.print(F("SIO2Arduino"));
   lcd.setCursor(0,1);
   #endif
 
   // initialize SD card
-  LOG_MSG("Initializing SD card...");
+  LOG_MSG(F("Initializing SD card..."));
   pinMode(PIN_SD_CS, OUTPUT);
 
   if (!card.init(SPI_HALF_SPEED, PIN_SD_CS)) {
-    LOG_MSG_CR(" failed.");
+    LOG_MSG_CR(F(" failed."));
     #ifdef LCD_DISPLAY
-      lcd.print("SD Init Error");
+      lcd.print(F("SD Init Error"));
     #endif     
     return;
   }
   
   if (!volume.init(&card)) {
-    LOG_MSG_CR(" failed.");
+    LOG_MSG_CR(F(" failed."));
     #ifdef LCD_DISPLAY
-      lcd.print("SD Volume Error");
+      lcd.print(F("SD Volume Error"));
     #endif     
     return;
   }
 
   if (!currDir.openRoot(&volume)) {
-    LOG_MSG_CR(" failed.");
+    LOG_MSG_CR(F(" failed."));
     #ifdef LCD_DISPLAY
-      lcd.print("SD Root Error");
+      lcd.print(F("SD Root Error"));
     #endif     
     return;
   }
 
-  LOG_MSG_CR(" done.");
+  LOG_MSG_CR(F(" done."));
   #ifdef LCD_DISPLAY
-    lcd.print("READY");
+    lcd.print(F("READY"));
+    delay(3000);
   #endif
+  mountFilename(0, "AUTORUN.ATR");
 }
 
 void loop() {
@@ -117,15 +120,14 @@ void loop() {
   
   #ifdef SELECTOR_BUTTON
   // watch the selector button (accounting for debounce)
-  if (digitalRead(PIN_SELECTOR) == HIGH && millis() - lastSelectionPress > 250) {
+  if (digitalRead(PIN_SELECTOR) == LOW && millis() - lastSelectionPress > 250 && isSwitchPressed==false) {
     lastSelectionPress = millis();
     changeDisk(0);
-  }
+  } else isSwitchPressed=(digitalRead(PIN_SELECTOR) == LOW);
   #endif
-  
   #ifdef RESET_BUTTON
   // watch the reset button
-  if (digitalRead(PIN_RESET) == HIGH && millis() - lastResetPress > 250) {
+  if (digitalRead(PIN_RESET) == LOW && millis() - lastResetPress > 250) {
     lastResetPress = millis();
     mountFilename(0, "AUTORUN.ATR");
   }
@@ -162,19 +164,19 @@ boolean format(int deviceId, int density) {
   char name[13];
   
   // get current filename
-  file.getFilename(name);
+  file.getName(name, 13);
 
   // close and delete the current file
   file.close();
   file.remove();
 
-  LOG_MSG("Remove old file: ");
+  LOG_MSG(F("Remove old file: "));
   LOG_MSG_CR(name);
 
   // open new file for writing
   file.open(&currDir, name, O_RDWR | O_SYNC | O_CREAT);
 
-  LOG_MSG("Created new file: ");
+  LOG_MSG(F("Created new file: "));
   LOG_MSG_CR(name);
 
   // allow the virtual drive to format the image (and possibly alter its size)
