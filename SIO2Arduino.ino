@@ -22,8 +22,6 @@
 */
 #include "config.h"
 #include <SdFat.h>
-#include <SdFatUtil.h>
-#include <SdVolume.h>
 #include "atari.h"
 #include "sio_channel.h"
 #include "disk_drive.h"
@@ -32,13 +30,23 @@
 #endif
 
 /**
+ * Function declarations
+ */
+DriveStatus* getDeviceStatus(int deviceId);
+SectorDataInfo* readSector(int deviceId, unsigned long sector, byte *data);
+boolean writeSector(int deviceId, unsigned long sector, byte* data, unsigned long length);
+boolean format(int deviceId, int density);
+int getFileList(int startIndex, int count, FileEntry *entries);
+void mountFileIndex(int deviceId, int ix);
+void changeDirectory(int ix);
+
+/**
  * Global variables
  */
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
 DriveControl driveControl(getFileList, mountFileIndex, changeDirectory);
 SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess, &driveControl);
 Sd2Card card;
-SdVolume volume;
 SdFile currDir;
 SdFile file; // TODO: make this unnecessary
 DiskDrive drive1;
@@ -82,7 +90,7 @@ void setup() {
   LOG_MSG(F("Initializing SD card..."));
   pinMode(PIN_SD_CS, OUTPUT);
 
-  if (!card.init(SPI_HALF_SPEED, PIN_SD_CS)) {
+  if (!card.begin(PIN_SD_CS, SD_SCK_MHZ(50))) {
     LOG_MSG_CR(F(" failed."));
     #ifdef LCD_DISPLAY
       lcd.print(F("SD Init Error"));
@@ -90,15 +98,7 @@ void setup() {
     return;
   }
   
-  if (!volume.init(&card)) {
-    LOG_MSG_CR(F(" failed."));
-    #ifdef LCD_DISPLAY
-      lcd.print(F("SD Volume Error"));
-    #endif     
-    return;
-  }
-
-  if (!currDir.openRoot(&volume)) {
+  if (!currDir.open("/")) {
     LOG_MSG_CR(F(" failed."));
     #ifdef LCD_DISPLAY
       lcd.print(F("SD Root Error"));
@@ -297,7 +297,7 @@ void changeDirectory(int ix) {
       currDir = subDir;
     }
   } else {
-    if (subDir.openRoot(&volume)) {
+    if (subDir.open("/")) {
       currDir = subDir;
     }
   }

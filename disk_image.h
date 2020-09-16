@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <SdFat.h>
-#include <SdFatUtil.h>
 #include "atari.h"
 #include "config.h"
 
