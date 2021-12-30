@@ -23,7 +23,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define USE_SD_VOLUME
 /**
  * These are SIO2Arduino feature definitions.
  */

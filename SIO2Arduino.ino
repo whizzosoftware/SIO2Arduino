@@ -46,7 +46,7 @@ void changeDirectory(int ix);
 DriveAccess driveAccess(getDeviceStatus, readSector, writeSector, format);
 DriveControl driveControl(getFileList, mountFileIndex, changeDirectory);
 SIOChannel sioChannel(PIN_ATARI_CMD, &SIO_UART, &driveAccess, &driveControl);
-Sd2Card card;
+SdFat32 card;
 SdFile currDir;
 SdFile file; // TODO: make this unnecessary
 DiskDrive drive1;
@@ -63,10 +63,17 @@ LiquidCrystal lcd(PIN_LCD_RD,PIN_LCD_ENABLE,PIN_LCD_DB4,PIN_LCD_DB5,PIN_LCD_DB6,
 #endif
 
 void setup() {
-#ifdef DEBUG
-  // set up logging serial port
-  LOGGING_UART.begin(115200);
-#endif
+  #ifdef DEBUG
+    // set up logging serial port
+    LOGGING_UART.begin(115200);
+    while (!LOGGING_UART) {
+      yield();
+    }
+    LOG_MSG_CR(F("Debug logging enabled"));
+    #ifdef ARDUINO_UNO
+      LOG_MSG_CR(F("WARNING: using debug logging with Uno, which only has 1 UART - SIO will conflict"));
+    #endif
+  #endif
 
   // initialize serial port to Atari
   SIO_UART.begin(19200);
@@ -190,18 +197,18 @@ boolean format(int deviceId, int density) {
 }
 
 void changeDisk(int deviceId) {
-  dir_t dir;
+  DirFat_t dir;
   char name[13];
   boolean imageChanged = false;
 
   while (!imageChanged) {
     // get next dir entry
-    int8_t result = currDir.readDir((dir_t*)&dir);
+    int8_t result = currDir.readDir((DirFat_t*)&dir);
     
     // if we got back a 0, rewind the directory and get the first dir entry
     if (!result) {
       currDir.rewind();
-      result = currDir.readDir((dir_t*)&dir);
+      result = currDir.readDir((DirFat_t*)&dir);
     }
     
     // if we have a valid file response code, open it
@@ -253,20 +260,20 @@ void createFilename(char* filename, char* name) {
  * entries = a pointer to the a FileEntry array to hold the returned data
  */
 int getFileList(int startIndex, int count, FileEntry *entries) {
-  dir_t dir;
+  DirFat_t dir;
   int currentEntry = 0;
 
   currDir.rewind();
 
   int ix = 0;
   while (ix < count) {
-    if (currDir.readDir((dir_t*)&dir) < 1) {
+    if (currDir.readDir((DirFat_t*)&dir) < 1) {
       break;
     }
-    if (isValidFilename((char*)&dir.name) || (DIR_IS_SUBDIR(&dir) && dir.name[0] != '.')) {
+    if (isValidFilename((char*)&dir.name) || (isSubdir(&dir) && dir.name[0] != '.')) {
       if (currentEntry >= startIndex) {
         memcpy(entries[ix].name, dir.name, 11);
-        if (DIR_IS_SUBDIR(&dir)) {
+        if (isSubdir(&dir)) {
           entries[ix].isDirectory = true;
         } else {
           entries[ix].isDirectory = false;
