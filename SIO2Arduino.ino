@@ -72,6 +72,7 @@ void setup() {
     LOG_MSG_CR(F("Debug logging enabled"));
     #ifdef ARDUINO_UNO
       LOG_MSG_CR(F("WARNING: using debug logging with Uno, which only has 1 UART - SIO will conflict"));
+      LOG_MSG_FLUSH(); // make sure this log displays before making the SIO connection
     #endif
   #endif
 

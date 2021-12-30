@@ -140,9 +140,11 @@
   #define LOGGING_UART Serial
   #define LOG_MSG(...) LOGGING_UART.print(__VA_ARGS__)
   #define LOG_MSG_CR(...) LOGGING_UART.println(__VA_ARGS__)
+  #define LOG_MSG_FLUSH() LOGGING_UART.flush()
 #else
   #define LOG_MSG(...)
   #define LOG_MSG_CR(...)
+  #define LOG_MSG_FLUSH()
 #endif
 
 #endif
